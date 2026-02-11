@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, AlertTriangle,
-  CheckCircle2, Scale, Target, Shield
+  CheckCircle2, Scale, Target, Shield, Wand2, Loader2
 } from "lucide-react";
 import OptionCard from "@/components/OptionCard";
 import PremortermPanel from "@/components/PremortermPanel";
@@ -35,6 +35,7 @@ export default function DecisionWorkspace() {
   const [context, setContext] = useState("");
   const [showAi, setShowAi] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -129,6 +130,64 @@ export default function DecisionWorkspace() {
     return outcomes.reduce((sum, o) => sum + (Number(o.probability) / 100) * Number(o.impact), 0);
   };
 
+  const autoGenerate = async () => {
+    if (!id || !title.trim()) {
+      toast({ title: "Enter a decision title first", variant: "destructive" });
+      return;
+    }
+    setGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
+        body: {
+          action: "auto_generate",
+          decision: { title, context },
+        },
+      });
+      if (error) throw error;
+      const gen = data.generated;
+      if (!gen?.options) throw new Error("No data generated");
+
+      // Insert options, outcomes, and premortems
+      for (let i = 0; i < gen.options.length; i++) {
+        const opt = gen.options[i];
+        const { data: inserted } = await supabase.from("options").insert({
+          decision_id: id,
+          title: opt.title,
+          description: opt.description || null,
+          sort_order: options.length + i,
+        }).select().single();
+
+        if (inserted && opt.outcomes) {
+          for (const oc of opt.outcomes) {
+            await supabase.from("outcomes").insert({
+              option_id: inserted.id,
+              description: oc.description,
+              probability: Math.max(0, Math.min(100, oc.probability)),
+              impact: Math.max(-10, Math.min(10, oc.impact)),
+            });
+          }
+        }
+      }
+
+      if (gen.premortems) {
+        for (const pm of gen.premortems) {
+          await supabase.from("premortems").insert({
+            decision_id: id,
+            reason: pm.reason,
+            severity: pm.severity || "medium",
+          });
+        }
+      }
+
+      await load();
+      toast({ title: "AI generated options, outcomes & risks!" });
+    } catch (err: any) {
+      toast({ title: "Generation failed", description: err.message, variant: "destructive" });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "options", label: "Options & Outcomes", icon: <Target className="w-4 h-4" /> },
     { key: "premortem", label: "Premortem", icon: <Shield className="w-4 h-4" /> },
@@ -180,6 +239,19 @@ export default function DecisionWorkspace() {
               placeholder="Describe the context and constraints..."
               rows={2}
             />
+            <Button
+              variant="outline"
+              onClick={autoGenerate}
+              disabled={generating || !title.trim()}
+              className="w-fit"
+            >
+              {generating ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="w-4 h-4 mr-2" />
+              )}
+              {generating ? "Generating..." : "Auto-Generate with AI"}
+            </Button>
           </motion.div>
 
           {/* Tabs */}
