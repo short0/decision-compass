@@ -14,6 +14,8 @@ const systemPrompts: Record<string, string> = {
   check_biases: `You are a cognitive bias expert inspired by Annie Duke's work on resulting, hindsight bias, and motivated reasoning. Analyze the user's decision framework and identify specific cognitive biases that might be affecting their analysis. Be direct, cite the specific bias by name, and explain how it might be distorting their thinking. Suggest concrete debiasing strategies.`,
 
   refine_reasoning: `You are a decision quality coach. Review the user's decision analysis including their options, outcomes, probabilities, and premortem analysis. Identify gaps in their reasoning, suggest refinements to probability estimates, and point out areas where their analysis could be stronger. Be constructive and specific.`,
+
+  auto_generate: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user will give you a decision title and context. You must generate a complete decision analysis with options, outcomes, and premortem risks. Be concrete, realistic, and balanced.`,
 };
 
 serve(async (req) => {
@@ -28,7 +30,9 @@ serve(async (req) => {
 
     const systemPrompt = systemPrompts[action] || systemPrompts.refine_reasoning;
 
-    const userContent = `Here is my decision analysis:
+    const userContent = action === "auto_generate"
+      ? `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}\n\nPlease generate a complete decision analysis.`
+      : `Here is my decision analysis:
 
 **Decision:** ${decision.title}
 **Context:** ${decision.context || "Not provided"}
@@ -43,19 +47,82 @@ ${decision.premortems?.length > 0 ? decision.premortems.map((p: any) => `- [${p.
 
 Please analyze and provide your insights.`;
 
+    const body: any = {
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
+      ],
+    };
+
+    // For auto_generate, use tool calling to get structured output
+    if (action === "auto_generate") {
+      body.tools = [
+        {
+          type: "function",
+          function: {
+            name: "generate_decision_analysis",
+            description: "Generate a complete decision analysis with options, outcomes for each option, and premortem risks.",
+            parameters: {
+              type: "object",
+              properties: {
+                options: {
+                  type: "array",
+                  description: "3-5 options the user should consider",
+                  items: {
+                    type: "object",
+                    properties: {
+                      title: { type: "string", description: "Short option title" },
+                      description: { type: "string", description: "Brief description of this option" },
+                      outcomes: {
+                        type: "array",
+                        description: "2-4 possible outcomes for this option",
+                        items: {
+                          type: "object",
+                          properties: {
+                            description: { type: "string" },
+                            probability: { type: "number", description: "Probability 0-100" },
+                            impact: { type: "number", description: "Impact from -10 to +10" },
+                          },
+                          required: ["description", "probability", "impact"],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ["title", "description", "outcomes"],
+                    additionalProperties: false,
+                  },
+                },
+                premortems: {
+                  type: "array",
+                  description: "3-6 premortem risks across all options",
+                  items: {
+                    type: "object",
+                    properties: {
+                      reason: { type: "string", description: "What could go wrong" },
+                      severity: { type: "string", enum: ["low", "medium", "high"] },
+                    },
+                    required: ["reason", "severity"],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ["options", "premortems"],
+              additionalProperties: false,
+            },
+          },
+        },
+      ];
+      body.tool_choice = { type: "function", function: { name: "generate_decision_analysis" } };
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userContent },
-        ],
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -77,8 +144,20 @@ Please analyze and provide your insights.`;
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "No response";
 
+    // Handle tool call response for auto_generate
+    if (action === "auto_generate") {
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall) {
+        const args = JSON.parse(toolCall.function.arguments);
+        return new Response(JSON.stringify({ generated: args }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error("No structured response from AI");
+    }
+
+    const content = data.choices?.[0]?.message?.content || "No response";
     return new Response(JSON.stringify({ content }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
