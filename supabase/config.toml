@@ -2,3 +2,6 @@ project_id = "ldjrcstgngahrvahzdpz"
 
 [functions.ai-decision-assist]
 verify_jwt = false
+
+[functions.ai-decision-chat]
+verify_jwt = false

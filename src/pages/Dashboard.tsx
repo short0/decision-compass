@@ -3,7 +3,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Plus, Scale, LogOut, Clock, CheckCircle2, BarChart3 } from "lucide-react";
+import { Plus, Scale, LogOut, Clock, CheckCircle2, BarChart3, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { Database } from "@/integrations/supabase/types";
 
 type Decision = Database["public"]["Tables"]["decisions"]["Row"];
@@ -35,6 +46,21 @@ export default function Dashboard() {
       .select()
       .single();
     if (data) navigate(`/decision/${data.id}`);
+  };
+
+  const deleteDecision = async (e: React.MouseEvent, decisionId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Delete related data first
+    const { data: opts } = await supabase.from("options").select("id").eq("decision_id", decisionId);
+    const optionIds = (opts || []).map(o => o.id);
+    if (optionIds.length > 0) {
+      await supabase.from("outcomes").delete().in("option_id", optionIds);
+    }
+    await supabase.from("premortems").delete().eq("decision_id", decisionId);
+    await supabase.from("options").delete().eq("decision_id", decisionId);
+    await supabase.from("decisions").delete().eq("id", decisionId);
+    loadDecisions();
   };
 
   const handleSignOut = async () => {
@@ -120,9 +146,40 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <span className="text-xs bg-secondary px-2 py-1 rounded-full capitalize text-secondary-foreground">
-                    {d.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs bg-secondary px-2 py-1 rounded-full capitalize text-secondary-foreground">
+                      {d.status}
+                    </span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete "{d.title}"?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this decision and all its data.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={(e) => deleteDecision(e, d.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                 </Link>
               </motion.div>
             ))}
