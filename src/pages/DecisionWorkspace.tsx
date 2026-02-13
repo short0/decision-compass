@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Plus, Trash2, Sparkles, AlertTriangle,
   CheckCircle2, Scale, Target, Shield, Wand2, Loader2,
-  Brain, X
+  Brain, X, ClipboardCheck
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
@@ -33,7 +33,7 @@ type Option = Database["public"]["Tables"]["options"]["Row"];
 type Outcome = Database["public"]["Tables"]["outcomes"]["Row"];
 type Premortem = Database["public"]["Tables"]["premortems"]["Row"];
 
-type Tab = "options" | "premortem" | "review";
+type Tab = "options" | "premortem" | "review" | "actual";
 
 export default function DecisionWorkspace() {
   const { id } = useParams<{ id: string }>();
@@ -112,6 +112,8 @@ export default function DecisionWorkspace() {
   };
 
   const deleteOption = async (optionId: string) => {
+    await supabase.from("outcomes").delete().eq("option_id", optionId);
+    await supabase.from("premortems").delete().eq("option_id", optionId);
     await supabase.from("options").delete().eq("id", optionId);
     load();
   };
@@ -337,6 +339,7 @@ export default function DecisionWorkspace() {
     { key: "options", label: "Options & Outcomes", icon: <Target className="w-4 h-4" /> },
     { key: "premortem", label: "Premortem", icon: <Shield className="w-4 h-4" /> },
     { key: "review", label: "Review", icon: <CheckCircle2 className="w-4 h-4" /> },
+    { key: "actual", label: "Actual Outcome", icon: <ClipboardCheck className="w-4 h-4" /> },
   ];
 
   if (!decision) return null;
@@ -590,6 +593,98 @@ export default function DecisionWorkspace() {
                       }}
                       rows={4}
                     />
+                  </div>
+                </motion.div>
+              )}
+
+              {tab === "actual" && (
+                <motion.div
+                  key="actual"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  className="space-y-6"
+                >
+                  <div className="glass-panel p-6 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <ClipboardCheck className="w-5 h-5 text-primary" />
+                      <h3 className="font-semibold text-lg">Record Actual Outcome</h3>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      After your decision plays out, record what actually happened to calibrate future decisions.
+                    </p>
+
+                    {options.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Which option did you choose?</label>
+                        <select
+                          value={decision.chosen_option_id || ""}
+                          onChange={async (e) => {
+                            const val = e.target.value || null;
+                            setDecision({ ...decision, chosen_option_id: val });
+                            await supabase.from("decisions").update({ chosen_option_id: val }).eq("id", decision.id);
+                          }}
+                          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="">— Not yet decided —</option>
+                          {options.map(o => (
+                            <option key={o.id} value={o.id}>{o.title}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">When did the outcome become clear?</label>
+                      <Input
+                        type="date"
+                        value={decision.outcome_date ? new Date(decision.outcome_date).toISOString().split("T")[0] : ""}
+                        onChange={async (e) => {
+                          const val = e.target.value ? new Date(e.target.value).toISOString() : null;
+                          setDecision({ ...decision, outcome_date: val });
+                          await supabase.from("decisions").update({ outcome_date: val }).eq("id", decision.id);
+                        }}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">What actually happened?</label>
+                      <Textarea
+                        placeholder="Describe the actual outcome — what went right, what went wrong, any surprises..."
+                        value={decision.actual_outcome || ""}
+                        onChange={async (e) => {
+                          setDecision({ ...decision, actual_outcome: e.target.value });
+                          await supabase.from("decisions").update({ actual_outcome: e.target.value }).eq("id", decision.id);
+                        }}
+                        rows={5}
+                      />
+                    </div>
+
+                    {decision.chosen_option_id && (
+                      <div className="glass-panel p-4 space-y-2 bg-muted/30">
+                        <h4 className="text-sm font-medium">Predicted vs Actual</h4>
+                        <p className="text-xs text-muted-foreground">
+                          You chose: <span className="font-semibold text-foreground">{options.find(o => o.id === decision.chosen_option_id)?.title}</span>
+                        </p>
+                        {(() => {
+                          const chosen = options.find(o => o.id === decision.chosen_option_id);
+                          if (!chosen || chosen.outcomes.length === 0) return null;
+                          return (
+                            <div className="space-y-1 mt-2">
+                              <p className="text-xs font-medium text-muted-foreground">Predicted outcomes:</p>
+                              {chosen.outcomes.map(oc => (
+                                <div key={oc.id} className="text-xs flex justify-between">
+                                  <span>{oc.description}</span>
+                                  <span className="font-mono text-muted-foreground">
+                                    {Number(oc.probability)}% · {Number(oc.impact) > 0 ? "+" : ""}{Number(oc.impact)}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               )}

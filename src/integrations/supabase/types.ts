@@ -16,10 +16,12 @@ export type Database = {
     Tables: {
       decisions: {
         Row: {
+          actual_outcome: string | null
           chosen_option_id: string | null
           context: string | null
           created_at: string
           id: string
+          outcome_date: string | null
           reflection: string | null
           status: string
           title: string
@@ -27,10 +29,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          actual_outcome?: string | null
           chosen_option_id?: string | null
           context?: string | null
           created_at?: string
           id?: string
+          outcome_date?: string | null
           reflection?: string | null
           status?: string
           title: string
@@ -38,10 +42,12 @@ export type Database = {
           user_id: string
         }
         Update: {
+          actual_outcome?: string | null
           chosen_option_id?: string | null
           context?: string | null
           created_at?: string
           id?: string
+          outcome_date?: string | null
           reflection?: string | null
           status?: string
           title?: string
