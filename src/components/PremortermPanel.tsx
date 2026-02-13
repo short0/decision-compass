@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Sparkles, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Database } from "@/integrations/supabase/types";
 import type { BiasAnnotation } from "@/components/OptionCard";
@@ -16,9 +16,11 @@ interface Props {
   onAdd: (optionId?: string) => void;
   onUpdate: (id: string, updates: Partial<Premortem>) => void;
   onDelete: (id: string) => void;
+  onSuggestPremortems: () => void;
+  suggestingPremortems: boolean;
 }
 
-export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete }: Props) {
+export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete, onSuggestPremortems, suggestingPremortems }: Props) {
   return (
     <div className="space-y-4">
       <div className="glass-panel p-6 space-y-4">
@@ -48,6 +50,19 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
         <Button variant="workspace" onClick={() => onAdd()} className="w-full">
           <Plus className="w-4 h-4 mr-1" />
           Add Risk
+        </Button>
+        <Button
+          variant="workspace"
+          onClick={onSuggestPremortems}
+          disabled={suggestingPremortems}
+          className="w-full"
+        >
+          {suggestingPremortems ? (
+            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+          ) : (
+            <Sparkles className="w-4 h-4 mr-1" />
+          )}
+          {suggestingPremortems ? "Suggesting..." : "Suggest Risks with AI"}
         </Button>
       </div>
     </div>
@@ -104,8 +119,9 @@ function PremortermRow({
               ⚠ {bias.bias_name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            <p className="text-sm">{bias.explanation}</p>
+          <TooltipContent side="bottom" className="max-w-xs z-50">
+            <p className="text-sm font-semibold mb-1">{bias.bias_name}</p>
+            <p className="text-xs">{bias.explanation}</p>
           </TooltipContent>
         </Tooltip>
       )}
