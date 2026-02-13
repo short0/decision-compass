@@ -67,17 +67,26 @@ export default function OptionCard({
                     ⚠ {optionBias.bias_name}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs">
-                  <p className="text-sm">{optionBias.explanation}</p>
+                <TooltipContent side="bottom" className="max-w-xs z-50">
+                  <p className="text-sm font-semibold mb-1">{optionBias.bias_name}</p>
+                  <p className="text-xs">{optionBias.explanation}</p>
                 </TooltipContent>
               </Tooltip>
             )}
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`font-mono text-sm font-semibold ${ev >= 0 ? "text-success" : "text-destructive"}`}>
-            EV: {ev.toFixed(2)}
-          </span>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`font-mono text-sm font-semibold cursor-help ${ev >= 0 ? "text-success" : "text-destructive"}`}>
+                EV: {ev.toFixed(2)}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs">
+              <p className="text-sm font-semibold mb-1">Expected Value (EV)</p>
+              <p className="text-xs text-muted-foreground">Sum of each outcome's probability × impact. Higher EV = better risk-adjusted choice.</p>
+            </TooltipContent>
+          </Tooltip>
           <Button variant="ghost" size="icon" onClick={() => setExpanded(!expanded)}>
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
@@ -98,10 +107,26 @@ export default function OptionCard({
           >
             <div className="px-4 pb-4 space-y-2">
               {option.outcomes.length > 0 && (
-                <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 text-xs text-muted-foreground font-mono px-1">
+              <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 text-xs text-muted-foreground font-mono px-1">
                   <span>Outcome</span>
-                  <span className="text-center">Prob %</span>
-                  <span className="text-center">Impact</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-center cursor-help underline decoration-dotted">Prob %</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm font-semibold mb-1">Probability (0–100%)</p>
+                      <p className="text-xs text-muted-foreground">How likely this outcome is to occur. All probabilities for an option should ideally sum to ~100%.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="text-center cursor-help underline decoration-dotted">Impact</span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-xs">
+                      <p className="text-sm font-semibold mb-1">Impact (−10 to +10)</p>
+                      <p className="text-xs text-muted-foreground">How good or bad this outcome would be. Negative = harmful, positive = beneficial. Scale relative to your situation.</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <span />
                 </div>
               )}
@@ -199,8 +224,9 @@ function OutcomeRow({
               ⚠ {bias.bias_name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs">
-            <p className="text-sm">{bias.explanation}</p>
+          <TooltipContent side="bottom" className="max-w-xs z-50">
+            <p className="text-sm font-semibold mb-1">{bias.bias_name}</p>
+            <p className="text-xs">{bias.explanation}</p>
           </TooltipContent>
         </Tooltip>
       )}

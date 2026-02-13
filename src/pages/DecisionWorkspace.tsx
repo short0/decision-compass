@@ -52,6 +52,7 @@ export default function DecisionWorkspace() {
   const [suggestingOption, setSuggestingOption] = useState(false);
   const [suggestingOutcomesFor, setSuggestingOutcomesFor] = useState<string | null>(null);
   const [checkingBiases, setCheckingBiases] = useState(false);
+  const [suggestingPremortems, setSuggestingPremortems] = useState(false);
   const [biases, setBiases] = useState<BiasAnnotation[]>([]);
 
   const load = useCallback(async () => {
@@ -305,6 +306,33 @@ export default function DecisionWorkspace() {
     }
   };
 
+  const suggestPremortems = async () => {
+    if (!id) return;
+    setSuggestingPremortems(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
+        body: { action: "suggest_premortems", decision: buildContext() },
+      });
+      if (error) throw error;
+      const gen = data.generated;
+      if (!gen?.premortems) throw new Error("No premortems generated");
+
+      for (const pm of gen.premortems) {
+        await supabase.from("premortems").insert({
+          decision_id: id,
+          reason: pm.reason,
+          severity: pm.severity || "medium",
+        });
+      }
+      await load();
+      toast({ title: `Added ${gen.premortems.length} potential risks` });
+    } catch (err: any) {
+      toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });
+    } finally {
+      setSuggestingPremortems(false);
+    }
+  };
+
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: "options", label: "Options & Outcomes", icon: <Target className="w-4 h-4" /> },
     { key: "premortem", label: "Premortem", icon: <Shield className="w-4 h-4" /> },
@@ -481,6 +509,8 @@ export default function DecisionWorkspace() {
                     onAdd={addPremortem}
                     onUpdate={updatePremortem}
                     onDelete={deletePremortem}
+                    onSuggestPremortems={suggestPremortems}
+                    suggestingPremortems={suggestingPremortems}
                   />
                 </motion.div>
               )}

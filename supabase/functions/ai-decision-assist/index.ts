@@ -11,7 +11,9 @@ const systemPrompts: Record<string, string> = {
 
   suggest_outcomes: `You are a decision analysis expert. For the specific option provided, suggest 2-3 additional outcomes the user may have missed, including both positive and negative scenarios. Estimate realistic probabilities and impact.`,
 
-  check_biases: `You are a cognitive bias expert inspired by Annie Duke's work. Analyze the user's decision framework and identify specific cognitive biases. For each bias found, specify which element it relates to (an option title, outcome description, or premortem reason). Be direct and cite specific bias names.`,
+  check_biases: `You are a cognitive bias expert inspired by Annie Duke's work. Analyze the user's decision framework and identify specific cognitive biases. For each bias found, specify which element it relates to (an option title, outcome description, or premortem reason). Be direct and cite specific bias names. For each bias, provide a concise explanation (1-2 sentences max) and include a brief real-world example.`,
+
+  suggest_premortems: `You are a premortem analysis expert inspired by Gary Klein's premortem technique. Imagine this decision has already failed. Identify 3-5 specific, concrete reasons why it could fail. Consider risks the user may have overlooked. Be specific and actionable.`,
 
   auto_generate: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user will give you a decision title and context. You must generate a complete decision analysis with options, outcomes, and premortem risks. Be concrete, realistic, and balanced.`,
 };
@@ -90,7 +92,7 @@ const checkBiasesTool = {
               bias_name: { type: "string", description: "Name of the cognitive bias" },
               target_type: { type: "string", enum: ["option", "outcome", "premortem", "general"], description: "What element this bias relates to" },
               target_label: { type: "string", description: "The title/description of the element this bias relates to, or empty for general" },
-              explanation: { type: "string", description: "How this bias is affecting their analysis and how to counteract it" },
+              explanation: { type: "string", description: "1-2 sentence explanation of how this bias affects the analysis, followed by a brief real-world example in parentheses" },
             },
             required: ["bias_name", "target_type", "target_label", "explanation"],
             additionalProperties: false,
@@ -98,6 +100,33 @@ const checkBiasesTool = {
         },
       },
       required: ["biases"],
+      additionalProperties: false,
+    },
+  },
+};
+
+const suggestPremorttemsTool = {
+  type: "function",
+  function: {
+    name: "suggest_premortems",
+    description: "Suggest premortem risks for the decision.",
+    parameters: {
+      type: "object",
+      properties: {
+        premortems: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              reason: { type: "string", description: "Specific reason why this decision could fail" },
+              severity: { type: "string", enum: ["low", "medium", "high"] },
+            },
+            required: ["reason", "severity"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["premortems"],
       additionalProperties: false,
     },
   },
@@ -202,6 +231,7 @@ serve(async (req) => {
       suggest_options: { tool: suggestOptionTool, name: "suggest_option" },
       suggest_outcomes: { tool: suggestOutcomesTool, name: "suggest_outcomes" },
       check_biases: { tool: checkBiasesTool, name: "check_biases" },
+      suggest_premortems: { tool: suggestPremorttemsTool, name: "suggest_premortems" },
       auto_generate: { tool: autoGenerateTool, name: "generate_decision_analysis" },
     };
 
