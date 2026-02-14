@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import ThemeToggle from "@/components/ThemeToggle";
+import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Plus, Scale, LogOut, Clock, CheckCircle2, BarChart3, Trash2 } from "lucide-react";
@@ -78,25 +79,25 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       <header className="border-b border-border">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Scale className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-lg">Decide</span>
+            <span className="font-semibold text-lg">Decy</span>
           </div>
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <Button variant="ghost" size="sm" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-1" />
-              Sign Out
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between">
+      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6 flex-1 w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold">Your Decisions</h1>
             <p className="text-muted-foreground text-sm mt-1">
@@ -141,17 +142,17 @@ export default function Dashboard() {
                   onClick={() => navigate(`/decision/${d.id}`)}
                   className="glass-panel p-5 flex items-center justify-between hover:border-primary/30 transition-colors cursor-pointer"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     {statusIcon(d.status)}
-                    <div>
-                      <h3 className="font-medium">{d.title}</h3>
+                    <div className="min-w-0">
+                      <h3 className="font-medium truncate">{d.title}</h3>
                       <p className="text-xs text-muted-foreground font-mono">
                         {new Date(d.updated_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs bg-secondary px-2 py-1 rounded-full capitalize text-secondary-foreground">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-xs bg-secondary px-2 py-1 rounded-full capitalize text-secondary-foreground hidden sm:inline">
                       {d.status}
                     </span>
                     <AlertDialog>
@@ -193,6 +194,7 @@ export default function Dashboard() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

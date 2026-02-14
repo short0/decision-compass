@@ -7,6 +7,9 @@ import { AuthProvider, useAuth } from "@/components/AuthProvider";
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import DecisionWorkspace from "./pages/DecisionWorkspace";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
+import ContactPage from "./pages/ContactPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +39,9 @@ const App = () => (
             <Route path="/auth" element={<AuthRoute><AuthPage /></AuthRoute>} />
             <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/decision/:id" element={<ProtectedRoute><DecisionWorkspace /></ProtectedRoute>} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
