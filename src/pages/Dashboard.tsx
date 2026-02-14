@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import ThemeToggle from "@/components/ThemeToggle";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Plus, Scale, LogOut, Clock, CheckCircle2, BarChart3, Trash2 } from "lucide-react";
@@ -84,10 +85,13 @@ export default function Dashboard() {
             <Scale className="w-5 h-5 text-primary" />
             <span className="font-semibold text-lg">Decide</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleSignOut}>
-            <LogOut className="w-4 h-4 mr-1" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-1" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -133,9 +137,9 @@ export default function Dashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.05 }}
               >
-                <Link
-                  to={`/decision/${d.id}`}
-                  className="glass-panel p-5 flex items-center justify-between hover:border-primary/30 transition-colors block"
+                <div
+                  onClick={() => navigate(`/decision/${d.id}`)}
+                  className="glass-panel p-5 flex items-center justify-between hover:border-primary/30 transition-colors cursor-pointer"
                 >
                   <div className="flex items-center gap-3">
                     {statusIcon(d.status)}
@@ -156,10 +160,7 @@ export default function Dashboard() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                          }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -172,9 +173,12 @@ export default function Dashboard() {
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel onClick={(e) => e.stopPropagation()}>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
                           <AlertDialogAction
-                            onClick={(e) => deleteDecision(e, d.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteDecision(e, d.id);
+                            }}
                             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                           >
                             Delete
@@ -183,7 +187,7 @@ export default function Dashboard() {
                       </AlertDialogContent>
                     </AlertDialog>
                   </div>
-                </Link>
+                </div>
               </motion.div>
             ))}
           </div>
