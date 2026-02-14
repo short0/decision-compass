@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
+import ThemeToggle from "@/components/ThemeToggle";
 import PremortermPanel from "@/components/PremortermPanel";
 import AiPanel from "@/components/AiPanel";
 import type { Database } from "@/integrations/supabase/types";
@@ -357,7 +358,8 @@ export default function DecisionWorkspace() {
                 </Button>
                 <Scale className="w-4 h-4 text-primary" />
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <ThemeToggle />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
