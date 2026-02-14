@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, X } from "lucide-react";
+import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, ArrowUp, ArrowDown } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Database } from "@/integrations/supabase/types";
@@ -19,20 +20,27 @@ export interface BiasAnnotation {
 interface Props {
   option: Option & { outcomes: Outcome[] };
   index: number;
+  totalOptions: number;
   ev: number;
   biases: BiasAnnotation[];
   onUpdate: (id: string, updates: Partial<Option>) => void;
   onDelete: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
   onAddOutcome: () => void;
   onUpdateOutcome: (id: string, updates: Partial<Outcome>) => void;
   onDeleteOutcome: (id: string) => void;
+  onMoveOutcomeUp: (outcomeId: string) => void;
+  onMoveOutcomeDown: (outcomeId: string) => void;
   onSuggestOutcomes: (optionId: string) => void;
   suggestingOutcomes: boolean;
 }
 
 export default function OptionCard({
-  option, index, ev, biases, onUpdate, onDelete,
+  option, index, totalOptions, ev, biases, onUpdate, onDelete,
+  onMoveUp, onMoveDown,
   onAddOutcome, onUpdateOutcome, onDeleteOutcome,
+  onMoveOutcomeUp, onMoveOutcomeDown,
   onSuggestOutcomes, suggestingOutcomes,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
@@ -50,10 +58,18 @@ export default function OptionCard({
       className={`glass-panel overflow-hidden ${optionBias ? "ring-1 ring-warning/50" : ""}`}
     >
       {/* Header */}
-      <div className="p-4 flex items-center justify-between">
-        <div className="flex items-center gap-3 flex-1">
-          <span className="text-xs font-mono text-muted-foreground w-6">#{index + 1}</span>
-          <div className="flex items-center gap-2 flex-1">
+      <div className="p-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex flex-col">
+            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onMoveUp} disabled={index === 0}>
+              <ArrowUp className="w-3 h-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onMoveDown} disabled={index === totalOptions - 1}>
+              <ArrowDown className="w-3 h-3" />
+            </Button>
+          </div>
+          <span className="text-xs font-mono text-muted-foreground w-6 shrink-0">#{index + 1}</span>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -75,7 +91,7 @@ export default function OptionCard({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Tooltip>
             <TooltipTrigger asChild>
               <span className={`font-mono text-sm font-semibold cursor-help ${ev >= 0 ? "text-success" : "text-destructive"}`}>
@@ -107,7 +123,8 @@ export default function OptionCard({
           >
             <div className="px-4 pb-4 space-y-2">
               {option.outcomes.length > 0 && (
-              <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 text-xs text-muted-foreground font-mono px-1">
+                <div className="hidden sm:grid grid-cols-[auto_1fr_80px_80px_32px] gap-2 text-xs text-muted-foreground font-mono px-1">
+                  <span className="w-14" />
                   <span>Outcome</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -124,21 +141,25 @@ export default function OptionCard({
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="max-w-xs">
                       <p className="text-sm font-semibold mb-1">Impact (−10 to +10)</p>
-                      <p className="text-xs text-muted-foreground">How good or bad this outcome would be. Negative = harmful, positive = beneficial. Scale relative to your situation.</p>
+                      <p className="text-xs text-muted-foreground">How good or bad this outcome would be. Negative = harmful, positive = beneficial.</p>
                     </TooltipContent>
                   </Tooltip>
                   <span />
                 </div>
               )}
-              {option.outcomes.map((oc) => (
+              {option.outcomes.map((oc, oci) => (
                 <OutcomeRow
                   key={oc.id}
                   outcome={oc}
+                  index={oci}
+                  totalOutcomes={option.outcomes.length}
                   bias={biases.find(
                     b => b.target_type === "outcome" && oc.description.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
                   )}
                   onUpdate={onUpdateOutcome}
                   onDelete={onDeleteOutcome}
+                  onMoveUp={() => onMoveOutcomeUp(oc.id)}
+                  onMoveDown={() => onMoveOutcomeDown(oc.id)}
                 />
               ))}
               <div className="flex gap-2">
@@ -171,14 +192,22 @@ export default function OptionCard({
 
 function OutcomeRow({
   outcome,
+  index,
+  totalOutcomes,
   bias,
   onUpdate,
   onDelete,
+  onMoveUp,
+  onMoveDown,
 }: {
   outcome: Outcome;
+  index: number;
+  totalOutcomes: number;
   bias?: BiasAnnotation;
   onUpdate: (id: string, updates: Partial<Outcome>) => void;
   onDelete: (id: string) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   const [desc, setDesc] = useState(outcome.description);
   const [prob, setProb] = useState(String(outcome.probability));
@@ -186,13 +215,23 @@ function OutcomeRow({
 
   return (
     <div className="space-y-1">
-      <div className="grid grid-cols-[1fr_100px_100px_32px] gap-2 items-center">
-        <Input
+      {/* Desktop layout */}
+      <div className="hidden sm:grid grid-cols-[auto_1fr_80px_80px_32px] gap-2 items-center">
+        <div className="flex flex-col w-14">
+          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveUp} disabled={index === 0}>
+            <ArrowUp className="w-2.5 h-2.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveDown} disabled={index === totalOutcomes - 1}>
+            <ArrowDown className="w-2.5 h-2.5" />
+          </Button>
+        </div>
+        <Textarea
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onBlur={() => onUpdate(outcome.id, { description: desc })}
-          className={`h-8 text-sm ${bias ? "border-warning/50" : ""}`}
+          className={`min-h-[36px] text-sm resize-none ${bias ? "border-warning/50" : ""}`}
           placeholder="Describe outcome..."
+          rows={1}
         />
         <Input
           type="number"
@@ -216,6 +255,57 @@ function OutcomeRow({
         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(outcome.id)}>
           <Trash2 className="w-3 h-3 text-muted-foreground" />
         </Button>
+      </div>
+      {/* Mobile layout */}
+      <div className="sm:hidden space-y-2 p-2 border border-border rounded-md">
+        <div className="flex items-center justify-between">
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveUp} disabled={index === 0}>
+              <ArrowUp className="w-3 h-3" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveDown} disabled={index === totalOutcomes - 1}>
+              <ArrowDown className="w-3 h-3" />
+            </Button>
+          </div>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(outcome.id)}>
+            <Trash2 className="w-3 h-3 text-muted-foreground" />
+          </Button>
+        </div>
+        <Textarea
+          value={desc}
+          onChange={(e) => setDesc(e.target.value)}
+          onBlur={() => onUpdate(outcome.id, { description: desc })}
+          className={`min-h-[36px] text-sm resize-none ${bias ? "border-warning/50" : ""}`}
+          placeholder="Describe outcome..."
+          rows={2}
+        />
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs text-muted-foreground">Prob %</label>
+            <Input
+              type="number"
+              min={0}
+              max={100}
+              value={prob}
+              onChange={(e) => setProb(e.target.value)}
+              onBlur={() => onUpdate(outcome.id, { probability: Number(prob) })}
+              className="h-8 text-sm text-center font-mono"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Impact</label>
+            <Input
+              type="number"
+              min={-10}
+              max={10}
+              step={0.5}
+              value={impact}
+              onChange={(e) => setImpact(e.target.value)}
+              onBlur={() => onUpdate(outcome.id, { impact: Number(impact) })}
+              className="h-8 text-sm text-center font-mono"
+            />
+          </div>
+        </div>
       </div>
       {bias && (
         <Tooltip>

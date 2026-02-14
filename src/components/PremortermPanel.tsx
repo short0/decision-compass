@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Plus, Trash2, AlertTriangle, Sparkles, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Plus, Trash2, AlertTriangle, Sparkles, Loader2, ArrowUp, ArrowDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Database } from "@/integrations/supabase/types";
 import type { BiasAnnotation } from "@/components/OptionCard";
@@ -16,11 +16,13 @@ interface Props {
   onAdd: (optionId?: string) => void;
   onUpdate: (id: string, updates: Partial<Premortem>) => void;
   onDelete: (id: string) => void;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
   onSuggestPremortems: () => void;
   suggestingPremortems: boolean;
 }
 
-export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete, onSuggestPremortems, suggestingPremortems }: Props) {
+export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete, onMoveUp, onMoveDown, onSuggestPremortems, suggestingPremortems }: Props) {
   return (
     <div className="space-y-4">
       <div className="glass-panel p-6 space-y-4">
@@ -33,16 +35,20 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
         </p>
 
         <div className="space-y-2">
-          {premortems.map((pm) => (
+          {premortems.map((pm, i) => (
             <PremortermRow
               key={pm.id}
               premortem={pm}
+              index={i}
+              totalPremortems={premortems.length}
               options={options}
               bias={biases.find(
                 b => b.target_type === "premortem" && pm.reason.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
               )}
               onUpdate={onUpdate}
               onDelete={onDelete}
+              onMoveUp={() => onMoveUp(pm.id)}
+              onMoveDown={() => onMoveDown(pm.id)}
             />
           ))}
         </div>
@@ -71,16 +77,24 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
 
 function PremortermRow({
   premortem,
+  index,
+  totalPremortems,
   options,
   bias,
   onUpdate,
   onDelete,
+  onMoveUp,
+  onMoveDown,
 }: {
   premortem: Premortem;
+  index: number;
+  totalPremortems: number;
   options: Option[];
   bias?: BiasAnnotation;
   onUpdate: (id: string, updates: Partial<Premortem>) => void;
   onDelete: (id: string) => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
 }) {
   const [reason, setReason] = useState(premortem.reason);
 
@@ -93,22 +107,31 @@ function PremortermRow({
   return (
     <div className="space-y-1">
       <div className="flex items-center gap-2">
-        <Input
+        <div className="flex flex-col shrink-0">
+          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveUp} disabled={index === 0}>
+            <ArrowUp className="w-2.5 h-2.5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveDown} disabled={index === totalPremortems - 1}>
+            <ArrowDown className="w-2.5 h-2.5" />
+          </Button>
+        </div>
+        <Textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           onBlur={() => onUpdate(premortem.id, { reason })}
-          className={`flex-1 h-9 text-sm ${bias ? "border-warning/50" : ""}`}
+          className={`flex-1 min-h-[36px] text-sm resize-none ${bias ? "border-warning/50" : ""}`}
+          rows={1}
         />
         <select
           value={premortem.severity}
           onChange={(e) => onUpdate(premortem.id, { severity: e.target.value })}
-          className={`h-9 px-2 rounded-md text-xs font-medium border-0 cursor-pointer ${severityColors[premortem.severity]}`}
+          className={`h-9 px-2 rounded-md text-xs font-medium border-0 cursor-pointer shrink-0 ${severityColors[premortem.severity]}`}
         >
           <option value="low">Low</option>
           <option value="medium">Medium</option>
           <option value="high">High</option>
         </select>
-        <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => onDelete(premortem.id)}>
+        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => onDelete(premortem.id)}>
           <Trash2 className="w-3 h-3 text-muted-foreground" />
         </Button>
       </div>

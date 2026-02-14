@@ -11,6 +11,7 @@ import {
   CheckCircle2, Scale, Target, Shield, Wand2, Loader2,
   Brain, X, ClipboardCheck
 } from "lucide-react";
+import Footer from "@/components/Footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -156,6 +157,44 @@ export default function DecisionWorkspace() {
 
   const deletePremortem = async (pmId: string) => {
     await supabase.from("premortems").delete().eq("id", pmId);
+    load();
+  };
+
+  const moveOption = async (idx: number, direction: "up" | "down") => {
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= options.length) return;
+    const a = options[idx];
+    const b = options[swapIdx];
+    await supabase.from("options").update({ sort_order: b.sort_order }).eq("id", a.id);
+    await supabase.from("options").update({ sort_order: a.sort_order }).eq("id", b.id);
+    load();
+  };
+
+  const moveOutcome = async (optionId: string, outcomeId: string, direction: "up" | "down") => {
+    const opt = options.find(o => o.id === optionId);
+    if (!opt) return;
+    const outcomes = opt.outcomes;
+    const idx = outcomes.findIndex(o => o.id === outcomeId);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= outcomes.length) return;
+    // Swap by re-inserting with swapped created_at isn't ideal, so we just swap in local state and reload
+    // We'll use a simple approach: delete and re-insert in order isn't great either.
+    // Best approach: swap the descriptions/data between the two outcome rows
+    const a = outcomes[idx];
+    const b = outcomes[swapIdx];
+    await supabase.from("outcomes").update({ description: b.description, probability: b.probability, impact: b.impact }).eq("id", a.id);
+    await supabase.from("outcomes").update({ description: a.description, probability: a.probability, impact: a.impact }).eq("id", b.id);
+    load();
+  };
+
+  const movePremortem = async (pmId: string, direction: "up" | "down") => {
+    const idx = premortems.findIndex(p => p.id === pmId);
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= premortems.length) return;
+    const a = premortems[idx];
+    const b = premortems[swapIdx];
+    await supabase.from("premortems").update({ reason: b.reason, severity: b.severity }).eq("id", a.id);
+    await supabase.from("premortems").update({ reason: a.reason, severity: a.severity }).eq("id", b.id);
     load();
   };
 
@@ -347,9 +386,9 @@ export default function DecisionWorkspace() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background flex">
+      <div className="min-h-screen bg-background flex flex-col">
         {/* Main workspace */}
-        <div className={`flex-1 transition-all ${showAi ? "mr-80 lg:mr-96" : ""}`}>
+        <div className={`flex-1 transition-all flex flex-col ${showAi ? "mr-80 lg:mr-96" : ""}`}>
           <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -394,7 +433,7 @@ export default function DecisionWorkspace() {
             </div>
           </header>
 
-          <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+          <main className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
             {/* Title & Context */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
               <Input
@@ -435,7 +474,7 @@ export default function DecisionWorkspace() {
             </motion.div>
 
             {/* Tabs */}
-            <div className="flex gap-1 p-1 bg-muted rounded-lg w-fit">
+            <div className="flex flex-wrap gap-1 p-1 bg-muted rounded-lg w-fit">
               {tabs.map(t => (
                 <button
                   key={t.key}
@@ -447,7 +486,7 @@ export default function DecisionWorkspace() {
                   }`}
                 >
                   {t.icon}
-                  {t.label}
+                  <span className="hidden sm:inline">{t.label}</span>
                 </button>
               ))}
             </div>
@@ -467,13 +506,18 @@ export default function DecisionWorkspace() {
                       key={option.id}
                       option={option}
                       index={i}
+                      totalOptions={options.length}
                       ev={calcEV(option.outcomes)}
                       biases={biases}
                       onUpdate={updateOption}
                       onDelete={() => deleteOption(option.id)}
+                      onMoveUp={() => moveOption(i, "up")}
+                      onMoveDown={() => moveOption(i, "down")}
                       onAddOutcome={() => addOutcome(option.id)}
                       onUpdateOutcome={updateOutcome}
                       onDeleteOutcome={deleteOutcome}
+                      onMoveOutcomeUp={(ocId) => moveOutcome(option.id, ocId, "up")}
+                      onMoveOutcomeDown={(ocId) => moveOutcome(option.id, ocId, "down")}
                       onSuggestOutcomes={suggestOutcomes}
                       suggestingOutcomes={suggestingOutcomesFor === option.id}
                     />
@@ -514,6 +558,8 @@ export default function DecisionWorkspace() {
                     onAdd={addPremortem}
                     onUpdate={updatePremortem}
                     onDelete={deletePremortem}
+                    onMoveUp={(id) => movePremortem(id, "up")}
+                    onMoveDown={(id) => movePremortem(id, "down")}
                     onSuggestPremortems={suggestPremortems}
                     suggestingPremortems={suggestingPremortems}
                   />
@@ -691,7 +737,8 @@ export default function DecisionWorkspace() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </main>
+           </main>
+          <Footer />
         </div>
 
         {/* AI Panel */}

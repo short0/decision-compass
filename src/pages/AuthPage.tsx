@@ -49,7 +49,7 @@ export default function AuthPage() {
           <div className="inline-flex items-center gap-2 text-primary mb-4">
             <Scale className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Decide</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Decy</h1>
           <p className="text-muted-foreground">
             Structured decision-making, powered by AI
           </p>
