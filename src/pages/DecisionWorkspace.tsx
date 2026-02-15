@@ -7,16 +7,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, Plus, Trash2, Sparkles, AlertTriangle,
-  CheckCircle2, Scale, Target, Shield, Wand2, Loader2,
-  Brain, X, ClipboardCheck
+  Plus, Trash2, Sparkles, AlertTriangle,
+  CheckCircle2, Target, Shield, Wand2, Loader2,
+  Brain, X, ClipboardCheck, GripVertical
 } from "lucide-react";
-import Footer from "@/components/Footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
-import ThemeToggle from "@/components/ThemeToggle";
 import PremortermPanel from "@/components/PremortermPanel";
 import AiPanel from "@/components/AiPanel";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import type { Database } from "@/integrations/supabase/types";
 import {
   AlertDialog,
@@ -57,6 +67,10 @@ export default function DecisionWorkspace() {
   const [suggestingPremortems, setSuggestingPremortems] = useState(false);
   const [biases, setBiases] = useState<BiasAnnotation[]>([]);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
   const load = useCallback(async () => {
     if (!id) return;
     const { data: d } = await supabase.from("decisions").select("*").eq("id", id).single();
@@ -87,6 +101,7 @@ export default function DecisionWorkspace() {
     if (!id) return;
     setSaving(true);
     await supabase.from("decisions").update({ title, context }).eq("id", id);
+    window.dispatchEvent(new Event("decisions-updated"));
     setSaving(false);
   };
 
@@ -99,6 +114,7 @@ export default function DecisionWorkspace() {
     }
     await supabase.from("options").delete().eq("decision_id", id);
     await supabase.from("decisions").delete().eq("id", id);
+    window.dispatchEvent(new Event("decisions-updated"));
     navigate("/");
     toast({ title: "Decision deleted" });
   };
@@ -141,6 +157,45 @@ export default function DecisionWorkspace() {
     load();
   };
 
+  const reorderOutcomes = async (optionId: string, activeId: string, overId: string) => {
+    const opt = options.find(o => o.id === optionId);
+    if (!opt) return;
+    const outcomes = [...opt.outcomes];
+    const activeIdx = outcomes.findIndex(o => o.id === activeId);
+    const overIdx = outcomes.findIndex(o => o.id === overId);
+    if (activeIdx === -1 || overIdx === -1) return;
+    // Swap data between the two rows
+    const a = outcomes[activeIdx];
+    const b = outcomes[overIdx];
+    await supabase.from("outcomes").update({ description: b.description, probability: b.probability, impact: b.impact }).eq("id", a.id);
+    await supabase.from("outcomes").update({ description: a.description, probability: a.probability, impact: a.impact }).eq("id", b.id);
+    load();
+  };
+
+  const handleOptionDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const activeIdx = options.findIndex(o => o.id === active.id);
+    const overIdx = options.findIndex(o => o.id === over.id);
+    if (activeIdx === -1 || overIdx === -1) return;
+    const a = options[activeIdx];
+    const b = options[overIdx];
+    supabase.from("options").update({ sort_order: b.sort_order }).eq("id", a.id).then(() =>
+      supabase.from("options").update({ sort_order: a.sort_order }).eq("id", b.id).then(() => load())
+    );
+  };
+
+  const reorderPremortems = async (activeId: string, overId: string) => {
+    const activeIdx = premortems.findIndex(p => p.id === activeId);
+    const overIdx = premortems.findIndex(p => p.id === overId);
+    if (activeIdx === -1 || overIdx === -1) return;
+    const a = premortems[activeIdx];
+    const b = premortems[overIdx];
+    await supabase.from("premortems").update({ reason: b.reason, severity: b.severity }).eq("id", a.id);
+    await supabase.from("premortems").update({ reason: a.reason, severity: a.severity }).eq("id", b.id);
+    load();
+  };
+
   const addPremortem = async (optionId?: string) => {
     if (!id) return;
     await supabase.from("premortems").insert({
@@ -157,44 +212,6 @@ export default function DecisionWorkspace() {
 
   const deletePremortem = async (pmId: string) => {
     await supabase.from("premortems").delete().eq("id", pmId);
-    load();
-  };
-
-  const moveOption = async (idx: number, direction: "up" | "down") => {
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= options.length) return;
-    const a = options[idx];
-    const b = options[swapIdx];
-    await supabase.from("options").update({ sort_order: b.sort_order }).eq("id", a.id);
-    await supabase.from("options").update({ sort_order: a.sort_order }).eq("id", b.id);
-    load();
-  };
-
-  const moveOutcome = async (optionId: string, outcomeId: string, direction: "up" | "down") => {
-    const opt = options.find(o => o.id === optionId);
-    if (!opt) return;
-    const outcomes = opt.outcomes;
-    const idx = outcomes.findIndex(o => o.id === outcomeId);
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= outcomes.length) return;
-    // Swap by re-inserting with swapped created_at isn't ideal, so we just swap in local state and reload
-    // We'll use a simple approach: delete and re-insert in order isn't great either.
-    // Best approach: swap the descriptions/data between the two outcome rows
-    const a = outcomes[idx];
-    const b = outcomes[swapIdx];
-    await supabase.from("outcomes").update({ description: b.description, probability: b.probability, impact: b.impact }).eq("id", a.id);
-    await supabase.from("outcomes").update({ description: a.description, probability: a.probability, impact: a.impact }).eq("id", b.id);
-    load();
-  };
-
-  const movePremortem = async (pmId: string, direction: "up" | "down") => {
-    const idx = premortems.findIndex(p => p.id === pmId);
-    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= premortems.length) return;
-    const a = premortems[idx];
-    const b = premortems[swapIdx];
-    await supabase.from("premortems").update({ reason: b.reason, severity: b.severity }).eq("id", a.id);
-    await supabase.from("premortems").update({ reason: a.reason, severity: a.severity }).eq("id", b.id);
     load();
   };
 
@@ -386,24 +403,20 @@ export default function DecisionWorkspace() {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="flex flex-col h-full">
         {/* Main workspace */}
         <div className={`flex-1 transition-all flex flex-col ${showAi ? "mr-80 lg:mr-96" : ""}`}>
           <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => navigate("/")}>
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-                <Scale className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-muted-foreground truncate max-w-[200px]">{title || "Untitled"}</span>
               </div>
               <div className="flex items-center gap-1">
-                <ThemeToggle />
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
                       <Trash2 className="w-4 h-4 mr-1" />
-                      Delete
+                      <span className="hidden sm:inline">Delete</span>
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -427,13 +440,13 @@ export default function DecisionWorkspace() {
                   onClick={() => setShowAi(!showAi)}
                 >
                   <Sparkles className="w-4 h-4 mr-1" />
-                  AI Chat
+                  <span className="hidden sm:inline">AI Chat</span>
                 </Button>
               </div>
             </div>
           </header>
 
-          <main className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
+          <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full overflow-y-auto">
             {/* Title & Context */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
               <Input
@@ -501,27 +514,28 @@ export default function DecisionWorkspace() {
                   exit={{ opacity: 0, y: -8 }}
                   className="space-y-4"
                 >
-                  {options.map((option, i) => (
-                    <OptionCard
-                      key={option.id}
-                      option={option}
-                      index={i}
-                      totalOptions={options.length}
-                      ev={calcEV(option.outcomes)}
-                      biases={biases}
-                      onUpdate={updateOption}
-                      onDelete={() => deleteOption(option.id)}
-                      onMoveUp={() => moveOption(i, "up")}
-                      onMoveDown={() => moveOption(i, "down")}
-                      onAddOutcome={() => addOutcome(option.id)}
-                      onUpdateOutcome={updateOutcome}
-                      onDeleteOutcome={deleteOutcome}
-                      onMoveOutcomeUp={(ocId) => moveOutcome(option.id, ocId, "up")}
-                      onMoveOutcomeDown={(ocId) => moveOutcome(option.id, ocId, "down")}
-                      onSuggestOutcomes={suggestOutcomes}
-                      suggestingOutcomes={suggestingOutcomesFor === option.id}
-                    />
-                  ))}
+                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
+                    <SortableContext items={options.map(o => o.id)} strategy={verticalListSortingStrategy}>
+                      {options.map((option, i) => (
+                        <OptionCard
+                          key={option.id}
+                          option={option}
+                          index={i}
+                          totalOptions={options.length}
+                          ev={calcEV(option.outcomes)}
+                          biases={biases}
+                          onUpdate={updateOption}
+                          onDelete={() => deleteOption(option.id)}
+                          onAddOutcome={() => addOutcome(option.id)}
+                          onUpdateOutcome={updateOutcome}
+                          onDeleteOutcome={deleteOutcome}
+                          onReorderOutcomes={(activeId, overId) => reorderOutcomes(option.id, activeId, overId)}
+                          onSuggestOutcomes={suggestOutcomes}
+                          suggestingOutcomes={suggestingOutcomesFor === option.id}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DndContext>
                   <div className="flex gap-2">
                     <Button variant="workspace" onClick={addOption} className="flex-1 py-6">
                       <Plus className="w-4 h-4 mr-1" />
@@ -558,8 +572,7 @@ export default function DecisionWorkspace() {
                     onAdd={addPremortem}
                     onUpdate={updatePremortem}
                     onDelete={deletePremortem}
-                    onMoveUp={(id) => movePremortem(id, "up")}
-                    onMoveDown={(id) => movePremortem(id, "down")}
+                    onReorder={reorderPremortems}
                     onSuggestPremortems={suggestPremortems}
                     suggestingPremortems={suggestingPremortems}
                   />
@@ -737,8 +750,7 @@ export default function DecisionWorkspace() {
                 </motion.div>
               )}
             </AnimatePresence>
-           </main>
-          <Footer />
+          </div>
         </div>
 
         {/* AI Panel */}
