@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { Scale, ArrowRight } from "lucide-react";
+import { Scale, ArrowRight, ArrowLeft } from "lucide-react";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,6 +14,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,6 +23,7 @@ export default function AuthPage() {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        navigate("/");
       } else {
         const { error } = await supabase.auth.signUp({
           email,
@@ -28,7 +31,7 @@ export default function AuthPage() {
           options: { emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast({ title: "Account created", description: "You can now sign in." });
+        toast({ title: "Account created", description: "Check your email to confirm, then sign in." });
         setIsLogin(true);
       }
     } catch (err: any) {
@@ -104,6 +107,13 @@ export default function AuthPage() {
               <ArrowRight className="w-4 h-4 ml-1" />
             </Button>
           </form>
+        </div>
+
+        <div className="text-center">
+          <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+            <ArrowLeft className="w-4 h-4 mr-1" />
+            Continue as Guest
+          </Button>
         </div>
       </motion.div>
     </div>

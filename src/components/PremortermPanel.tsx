@@ -1,8 +1,22 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, AlertTriangle, Sparkles, Loader2, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Sparkles, Loader2, GripVertical } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Database } from "@/integrations/supabase/types";
 import type { BiasAnnotation } from "@/components/OptionCard";
 
@@ -16,13 +30,23 @@ interface Props {
   onAdd: (optionId?: string) => void;
   onUpdate: (id: string, updates: Partial<Premortem>) => void;
   onDelete: (id: string) => void;
-  onMoveUp: (id: string) => void;
-  onMoveDown: (id: string) => void;
+  onReorder: (activeId: string, overId: string) => void;
   onSuggestPremortems: () => void;
   suggestingPremortems: boolean;
 }
 
-export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete, onMoveUp, onMoveDown, onSuggestPremortems, suggestingPremortems }: Props) {
+export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete, onReorder, onSuggestPremortems, suggestingPremortems }: Props) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorder(String(active.id), String(over.id));
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="glass-panel p-6 space-y-4">
@@ -34,24 +58,24 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
           Imagine this decision has failed. What went wrong? List every reason you can think of.
         </p>
 
-        <div className="space-y-2">
-          {premortems.map((pm, i) => (
-            <PremortermRow
-              key={pm.id}
-              premortem={pm}
-              index={i}
-              totalPremortems={premortems.length}
-              options={options}
-              bias={biases.find(
-                b => b.target_type === "premortem" && pm.reason.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
-              )}
-              onUpdate={onUpdate}
-              onDelete={onDelete}
-              onMoveUp={() => onMoveUp(pm.id)}
-              onMoveDown={() => onMoveDown(pm.id)}
-            />
-          ))}
-        </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={premortems.map(p => p.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {premortems.map((pm) => (
+                <SortablePremortermRow
+                  key={pm.id}
+                  premortem={pm}
+                  options={options}
+                  bias={biases.find(
+                    b => b.target_type === "premortem" && pm.reason.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
+                  )}
+                  onUpdate={onUpdate}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
 
         <Button variant="workspace" onClick={() => onAdd()} className="w-full">
           <Plus className="w-4 h-4 mr-1" />
@@ -75,28 +99,35 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
   );
 }
 
-function PremortermRow({
+function SortablePremortermRow({
   premortem,
-  index,
-  totalPremortems,
   options,
   bias,
   onUpdate,
   onDelete,
-  onMoveUp,
-  onMoveDown,
 }: {
   premortem: Premortem;
-  index: number;
-  totalPremortems: number;
   options: Option[];
   bias?: BiasAnnotation;
   onUpdate: (id: string, updates: Partial<Premortem>) => void;
   onDelete: (id: string) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
 }) {
   const [reason, setReason] = useState(premortem.reason);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: premortem.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   const severityColors: Record<string, string> = {
     low: "bg-muted text-muted-foreground",
@@ -105,16 +136,15 @@ function PremortermRow({
   };
 
   return (
-    <div className="space-y-1">
+    <div ref={setNodeRef} style={style} className="space-y-1">
       <div className="flex items-center gap-2">
-        <div className="flex flex-col shrink-0">
-          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveUp} disabled={index === 0}>
-            <ArrowUp className="w-2.5 h-2.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveDown} disabled={index === totalPremortems - 1}>
-            <ArrowDown className="w-2.5 h-2.5" />
-          </Button>
-        </div>
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground shrink-0 touch-none"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
         <Textarea
           value={reason}
           onChange={(e) => setReason(e.target.value)}
@@ -142,7 +172,7 @@ function PremortermRow({
               ⚠ {bias.bias_name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs z-50">
+          <TooltipContent side="bottom" className="max-w-xs">
             <p className="text-sm font-semibold mb-1">{bias.bias_name}</p>
             <p className="text-xs">{bias.explanation}</p>
           </TooltipContent>

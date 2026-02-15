@@ -16,12 +16,17 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const systemPrompt = `You are a decision analysis assistant inspired by Annie Duke's "How to Decide". You help users think through decisions more clearly. You have context about the user's current decision analysis below.
+    const systemPrompt = `You are a decision analysis assistant. You help users think through decisions clearly.
 
 Current Decision Context:
 ${decision_context}
 
-Help the user by answering questions, challenging assumptions, and improving their decision quality. Be concise and actionable. Use markdown formatting.`;
+RULES:
+- Be concise and direct. Max 3-4 sentences per response unless more detail is explicitly asked for.
+- Use bullet points for lists.
+- Challenge assumptions briefly.
+- No filler phrases like "That's a great question" or "I'd be happy to help".
+- Use markdown sparingly.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

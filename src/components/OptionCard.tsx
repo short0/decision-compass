@@ -2,9 +2,23 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, ArrowUp, ArrowDown } from "lucide-react";
+import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, GripVertical } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import type { Database } from "@/integrations/supabase/types";
 
 type Option = Database["public"]["Tables"]["options"]["Row"];
@@ -25,49 +39,68 @@ interface Props {
   biases: BiasAnnotation[];
   onUpdate: (id: string, updates: Partial<Option>) => void;
   onDelete: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
   onAddOutcome: () => void;
   onUpdateOutcome: (id: string, updates: Partial<Outcome>) => void;
   onDeleteOutcome: (id: string) => void;
-  onMoveOutcomeUp: (outcomeId: string) => void;
-  onMoveOutcomeDown: (outcomeId: string) => void;
+  onReorderOutcomes: (activeId: string, overId: string) => void;
   onSuggestOutcomes: (optionId: string) => void;
   suggestingOutcomes: boolean;
 }
 
 export default function OptionCard({
   option, index, totalOptions, ev, biases, onUpdate, onDelete,
-  onMoveUp, onMoveDown,
   onAddOutcome, onUpdateOutcome, onDeleteOutcome,
-  onMoveOutcomeUp, onMoveOutcomeDown,
-  onSuggestOutcomes, suggestingOutcomes,
+  onReorderOutcomes, onSuggestOutcomes, suggestingOutcomes,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
   const [title, setTitle] = useState(option.title);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: option.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const handleOutcomeDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      onReorderOutcomes(String(active.id), String(over.id));
+    }
+  };
 
   const optionBias = biases.find(
     b => b.target_type === "option" && option.title.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
-      className={`glass-panel overflow-hidden ${optionBias ? "ring-1 ring-warning/50" : ""}`}
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`glass-panel overflow-visible ${optionBias ? "ring-1 ring-warning/50" : ""}`}
     >
       {/* Header */}
       <div className="p-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="flex flex-col">
-            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onMoveUp} disabled={index === 0}>
-              <ArrowUp className="w-3 h-3" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onMoveDown} disabled={index === totalOptions - 1}>
-              <ArrowDown className="w-3 h-3" />
-            </Button>
-          </div>
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
           <span className="text-xs font-mono text-muted-foreground w-6 shrink-0">#{index + 1}</span>
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Input
@@ -83,7 +116,7 @@ export default function OptionCard({
                     ⚠ {optionBias.bias_name}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-xs z-50">
+                <TooltipContent side="bottom" className="max-w-xs">
                   <p className="text-sm font-semibold mb-1">{optionBias.bias_name}</p>
                   <p className="text-xs">{optionBias.explanation}</p>
                 </TooltipContent>
@@ -123,8 +156,8 @@ export default function OptionCard({
           >
             <div className="px-4 pb-4 space-y-2">
               {option.outcomes.length > 0 && (
-                <div className="hidden sm:grid grid-cols-[auto_1fr_80px_80px_32px] gap-2 text-xs text-muted-foreground font-mono px-1">
-                  <span className="w-14" />
+                <div className="hidden sm:grid grid-cols-[24px_1fr_80px_80px_32px] gap-2 text-xs text-muted-foreground font-mono px-1">
+                  <span />
                   <span>Outcome</span>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -132,7 +165,7 @@ export default function OptionCard({
                     </TooltipTrigger>
                     <TooltipContent side="bottom" className="max-w-xs">
                       <p className="text-sm font-semibold mb-1">Probability (0–100%)</p>
-                      <p className="text-xs text-muted-foreground">How likely this outcome is to occur. All probabilities for an option should ideally sum to ~100%.</p>
+                      <p className="text-xs text-muted-foreground">How likely this outcome is to occur. All probabilities for an option should sum to 100%.</p>
                     </TooltipContent>
                   </Tooltip>
                   <Tooltip>
@@ -147,21 +180,28 @@ export default function OptionCard({
                   <span />
                 </div>
               )}
-              {option.outcomes.map((oc, oci) => (
-                <OutcomeRow
-                  key={oc.id}
-                  outcome={oc}
-                  index={oci}
-                  totalOutcomes={option.outcomes.length}
-                  bias={biases.find(
-                    b => b.target_type === "outcome" && oc.description.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
-                  )}
-                  onUpdate={onUpdateOutcome}
-                  onDelete={onDeleteOutcome}
-                  onMoveUp={() => onMoveOutcomeUp(oc.id)}
-                  onMoveDown={() => onMoveOutcomeDown(oc.id)}
-                />
-              ))}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleOutcomeDragEnd}
+              >
+                <SortableContext
+                  items={option.outcomes.map(o => o.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {option.outcomes.map((oc) => (
+                    <SortableOutcomeRow
+                      key={oc.id}
+                      outcome={oc}
+                      bias={biases.find(
+                        b => b.target_type === "outcome" && oc.description.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
+                      )}
+                      onUpdate={onUpdateOutcome}
+                      onDelete={onDeleteOutcome}
+                    />
+                  ))}
+                </SortableContext>
+              </DndContext>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={onAddOutcome} className="text-xs">
                   <Plus className="w-3 h-3 mr-1" />
@@ -186,45 +226,51 @@ export default function OptionCard({
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
-function OutcomeRow({
+function SortableOutcomeRow({
   outcome,
-  index,
-  totalOutcomes,
   bias,
   onUpdate,
   onDelete,
-  onMoveUp,
-  onMoveDown,
 }: {
   outcome: Outcome;
-  index: number;
-  totalOutcomes: number;
   bias?: BiasAnnotation;
   onUpdate: (id: string, updates: Partial<Outcome>) => void;
   onDelete: (id: string) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
 }) {
   const [desc, setDesc] = useState(outcome.description);
   const [prob, setProb] = useState(String(outcome.probability));
   const [impact, setImpact] = useState(String(outcome.impact));
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: outcome.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
   return (
-    <div className="space-y-1">
+    <div ref={setNodeRef} style={style} className="space-y-1">
       {/* Desktop layout */}
-      <div className="hidden sm:grid grid-cols-[auto_1fr_80px_80px_32px] gap-2 items-center">
-        <div className="flex flex-col w-14">
-          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveUp} disabled={index === 0}>
-            <ArrowUp className="w-2.5 h-2.5" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-4 w-4" onClick={onMoveDown} disabled={index === totalOutcomes - 1}>
-            <ArrowDown className="w-2.5 h-2.5" />
-          </Button>
-        </div>
+      <div className="hidden sm:grid grid-cols-[24px_1fr_80px_80px_32px] gap-2 items-center">
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+        >
+          <GripVertical className="w-3 h-3" />
+        </button>
         <Textarea
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
@@ -259,14 +305,13 @@ function OutcomeRow({
       {/* Mobile layout */}
       <div className="sm:hidden space-y-2 p-2 border border-border rounded-md">
         <div className="flex items-center justify-between">
-          <div className="flex gap-1">
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveUp} disabled={index === 0}>
-              <ArrowUp className="w-3 h-3" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMoveDown} disabled={index === totalOutcomes - 1}>
-              <ArrowDown className="w-3 h-3" />
-            </Button>
-          </div>
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-muted-foreground touch-none"
+          >
+            <GripVertical className="w-4 h-4" />
+          </button>
           <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(outcome.id)}>
             <Trash2 className="w-3 h-3 text-muted-foreground" />
           </Button>
@@ -314,7 +359,7 @@ function OutcomeRow({
               ⚠ {bias.bias_name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="max-w-xs z-50">
+          <TooltipContent side="bottom" className="max-w-xs">
             <p className="text-sm font-semibold mb-1">{bias.bias_name}</p>
             <p className="text-xs">{bias.explanation}</p>
           </TooltipContent>
