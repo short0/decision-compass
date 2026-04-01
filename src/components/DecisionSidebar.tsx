@@ -1,18 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { api, type Decision } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
-import type { Database } from "@/integrations/supabase/types";
-
-type Decision = Database["public"]["Tables"]["decisions"]["Row"];
 
 export default function DecisionSidebar() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [collapsed, setCollapsed] = useState(false);
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, refetch } = useAuth();
   const navigate = useNavigate();
   const { id: activeId } = useParams();
 
@@ -21,33 +18,27 @@ export default function DecisionSidebar() {
   }, [user]);
 
   const loadDecisions = async () => {
-    const { data } = await supabase
-      .from("decisions")
-      .select("*")
-      .order("updated_at", { ascending: false });
-    setDecisions(data || []);
+    try {
+      const data = await api.decisions.list();
+      setDecisions(data || []);
+    } catch {
+      setDecisions([]);
+    }
   };
 
   const deleteDecision = async (e: React.MouseEvent, decisionId: string) => {
     e.stopPropagation();
-    const { data: opts } = await supabase.from("options").select("id").eq("decision_id", decisionId);
-    const optionIds = (opts || []).map(o => o.id);
-    if (optionIds.length > 0) {
-      await supabase.from("outcomes").delete().in("option_id", optionIds);
-    }
-    await supabase.from("premortems").delete().eq("decision_id", decisionId);
-    await supabase.from("options").delete().eq("decision_id", decisionId);
-    await supabase.from("decisions").delete().eq("id", decisionId);
+    await api.decisions.delete(decisionId);
     loadDecisions();
     if (activeId === decisionId) navigate("/");
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await api.auth.logout();
+    await refetch();
     navigate("/auth");
   };
 
-  // Expose loadDecisions via a custom event so other components can trigger refresh
   useEffect(() => {
     const handler = () => loadDecisions();
     window.addEventListener("decisions-updated", handler);
@@ -67,7 +58,6 @@ export default function DecisionSidebar() {
 
   return (
     <div className="w-64 border-r border-border bg-sidebar-background flex flex-col shrink-0 h-full">
-      {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Scale className="w-4 h-4 text-primary" />
@@ -78,7 +68,6 @@ export default function DecisionSidebar() {
         </Button>
       </div>
 
-      {/* New Decision */}
       <div className="p-2">
         <Button
           variant="outline"
@@ -91,7 +80,6 @@ export default function DecisionSidebar() {
         </Button>
       </div>
 
-      {/* Decision List */}
       <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
         {decisions.map(d => (
           <div
@@ -116,7 +104,6 @@ export default function DecisionSidebar() {
         ))}
       </div>
 
-      {/* Footer */}
       <div className="p-2 border-t border-border space-y-1">
         <ThemeToggle />
         {isGuest ? (

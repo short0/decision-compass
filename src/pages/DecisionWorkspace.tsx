@@ -1,49 +1,27 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { api, type Decision, type Option, type Outcome, type Premortem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, Trash2, Sparkles, AlertTriangle,
-  CheckCircle2, Target, Shield, Wand2, Loader2,
-  Brain, X, ClipboardCheck, GripVertical
+  Plus, Trash2, Sparkles, CheckCircle2, Target, Shield, Wand2, Loader2,
+  Brain, X, ClipboardCheck,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
 import PremortermPanel from "@/components/PremortermPanel";
 import AiPanel from "@/components/AiPanel";
 import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
+  DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import type { Database } from "@/integrations/supabase/types";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-
-type Decision = Database["public"]["Tables"]["decisions"]["Row"];
-type Option = Database["public"]["Tables"]["options"]["Row"];
-type Outcome = Database["public"]["Tables"]["outcomes"]["Row"];
-type Premortem = Database["public"]["Tables"]["premortems"]["Row"];
 
 type Tab = "options" | "premortem" | "review" | "actual";
 
@@ -67,32 +45,23 @@ export default function DecisionWorkspace() {
   const [suggestingPremortems, setSuggestingPremortems] = useState(false);
   const [biases, setBiases] = useState<BiasAnnotation[]>([]);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const load = useCallback(async () => {
     if (!id) return;
-    const { data: d } = await supabase.from("decisions").select("*").eq("id", id).single();
-    if (!d) { navigate("/"); return; }
-    setDecision(d);
-    setTitle(d.title);
-    setContext(d.context || "");
-
-    const { data: opts } = await supabase.from("options").select("*").eq("decision_id", id).order("sort_order");
-    const optionIds = (opts || []).map(o => o.id);
-    let allOutcomes: Outcome[] = [];
-    if (optionIds.length > 0) {
-      const { data: oc } = await supabase.from("outcomes").select("*").in("option_id", optionIds);
-      allOutcomes = oc || [];
+    try {
+      const d = await api.decisions.get(id);
+      if (!d) { navigate("/"); return; }
+      setDecision(d);
+      setTitle(d.title);
+      setContext(d.context || "");
+      const opts = await api.options.list(id);
+      setOptions(opts || []);
+      const pm = await api.premortems.list(id);
+      setPremortems(pm || []);
+    } catch {
+      navigate("/");
     }
-    setOptions((opts || []).map(o => ({
-      ...o,
-      outcomes: allOutcomes.filter(oc => oc.option_id === o.id),
-    })));
-
-    const { data: pm } = await supabase.from("premortems").select("*").eq("decision_id", id);
-    setPremortems(pm || []);
   }, [id, navigate]);
 
   useEffect(() => { load(); }, [load]);
@@ -100,20 +69,14 @@ export default function DecisionWorkspace() {
   const saveDecision = async () => {
     if (!id) return;
     setSaving(true);
-    await supabase.from("decisions").update({ title, context }).eq("id", id);
+    await api.decisions.update(id, { title, context: context || null });
     window.dispatchEvent(new Event("decisions-updated"));
     setSaving(false);
   };
 
   const deleteDecision = async () => {
     if (!id) return;
-    await supabase.from("premortems").delete().eq("decision_id", id);
-    const optionIds = options.map(o => o.id);
-    if (optionIds.length > 0) {
-      await supabase.from("outcomes").delete().in("option_id", optionIds);
-    }
-    await supabase.from("options").delete().eq("decision_id", id);
-    await supabase.from("decisions").delete().eq("id", id);
+    await api.decisions.delete(id);
     window.dispatchEvent(new Event("decisions-updated"));
     navigate("/");
     toast({ title: "Decision deleted" });
@@ -121,54 +84,47 @@ export default function DecisionWorkspace() {
 
   const addOption = async () => {
     if (!id) return;
-    await supabase.from("options").insert({
-      decision_id: id,
+    await api.options.create(id, {
       title: `Option ${options.length + 1}`,
-      sort_order: options.length,
-    });
+      sortOrder: options.length,
+    } as any);
     load();
   };
 
   const deleteOption = async (optionId: string) => {
-    await supabase.from("outcomes").delete().eq("option_id", optionId);
-    await supabase.from("premortems").delete().eq("option_id", optionId);
-    await supabase.from("options").delete().eq("id", optionId);
+    await api.options.delete(optionId);
     load();
   };
 
   const updateOption = async (optionId: string, updates: Partial<Option>) => {
-    await supabase.from("options").update(updates).eq("id", optionId);
+    await api.options.update(optionId, updates);
   };
 
   const addOutcome = async (optionId: string) => {
-    await supabase.from("outcomes").insert({
-      option_id: optionId,
-      description: "New outcome",
-    });
+    await api.outcomes.create(optionId, { description: "New outcome" } as any);
     load();
   };
 
   const updateOutcome = async (outcomeId: string, updates: Partial<Outcome>) => {
-    await supabase.from("outcomes").update(updates).eq("id", outcomeId);
+    await api.outcomes.update(outcomeId, updates);
   };
 
   const deleteOutcome = async (outcomeId: string) => {
-    await supabase.from("outcomes").delete().eq("id", outcomeId);
+    await api.outcomes.delete(outcomeId);
     load();
   };
 
   const reorderOutcomes = async (optionId: string, activeId: string, overId: string) => {
     const opt = options.find(o => o.id === optionId);
     if (!opt) return;
-    const outcomes = [...opt.outcomes];
-    const activeIdx = outcomes.findIndex(o => o.id === activeId);
-    const overIdx = outcomes.findIndex(o => o.id === overId);
+    const ocs = [...opt.outcomes];
+    const activeIdx = ocs.findIndex(o => o.id === activeId);
+    const overIdx = ocs.findIndex(o => o.id === overId);
     if (activeIdx === -1 || overIdx === -1) return;
-    // Swap data between the two rows
-    const a = outcomes[activeIdx];
-    const b = outcomes[overIdx];
-    await supabase.from("outcomes").update({ description: b.description, probability: b.probability, impact: b.impact }).eq("id", a.id);
-    await supabase.from("outcomes").update({ description: a.description, probability: a.probability, impact: a.impact }).eq("id", b.id);
+    const a = ocs[activeIdx];
+    const b = ocs[overIdx];
+    await api.outcomes.update(a.id, { description: b.description, probability: b.probability, impact: b.impact });
+    await api.outcomes.update(b.id, { description: a.description, probability: a.probability, impact: a.impact });
     load();
   };
 
@@ -180,9 +136,10 @@ export default function DecisionWorkspace() {
     if (activeIdx === -1 || overIdx === -1) return;
     const a = options[activeIdx];
     const b = options[overIdx];
-    supabase.from("options").update({ sort_order: b.sort_order }).eq("id", a.id).then(() =>
-      supabase.from("options").update({ sort_order: a.sort_order }).eq("id", b.id).then(() => load())
-    );
+    Promise.all([
+      api.options.update(a.id, { sortOrder: b.sortOrder } as any),
+      api.options.update(b.id, { sortOrder: a.sortOrder } as any),
+    ]).then(() => load());
   };
 
   const reorderPremortems = async (activeId: string, overId: string) => {
@@ -191,33 +148,29 @@ export default function DecisionWorkspace() {
     if (activeIdx === -1 || overIdx === -1) return;
     const a = premortems[activeIdx];
     const b = premortems[overIdx];
-    await supabase.from("premortems").update({ reason: b.reason, severity: b.severity }).eq("id", a.id);
-    await supabase.from("premortems").update({ reason: a.reason, severity: a.severity }).eq("id", b.id);
+    await api.premortems.update(a.id, { reason: b.reason, severity: b.severity });
+    await api.premortems.update(b.id, { reason: a.reason, severity: a.severity });
     load();
   };
 
   const addPremortem = async (optionId?: string) => {
     if (!id) return;
-    await supabase.from("premortems").insert({
-      decision_id: id,
-      option_id: optionId || null,
-      reason: "What could go wrong?",
-    });
+    await api.premortems.create(id, { option_id: optionId || null } as any);
     load();
   };
 
   const updatePremortem = async (pmId: string, updates: Partial<Premortem>) => {
-    await supabase.from("premortems").update(updates).eq("id", pmId);
+    await api.premortems.update(pmId, updates);
   };
 
   const deletePremortem = async (pmId: string) => {
-    await supabase.from("premortems").delete().eq("id", pmId);
+    await api.premortems.delete(pmId);
     load();
   };
 
-  const calcEV = (outcomes: Outcome[]) => {
-    if (outcomes.length === 0) return 0;
-    return outcomes.reduce((sum, o) => sum + (Number(o.probability) / 100) * Number(o.impact), 0);
+  const calcEV = (ocs: Outcome[]) => {
+    if (ocs.length === 0) return 0;
+    return ocs.reduce((sum, o) => sum + (Number(o.probability) / 100) * Number(o.impact), 0);
   };
 
   const buildContext = () => ({
@@ -241,33 +194,29 @@ export default function DecisionWorkspace() {
     }
     setGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
-        body: { action: "auto_generate", decision: { title, context } },
-      });
-      if (error) throw error;
-      const gen = data.generated;
+      const { generated: gen } = await api.ai.assist("auto_generate", { title, context });
       if (!gen?.options) throw new Error("No data generated");
 
       for (let i = 0; i < gen.options.length; i++) {
         const opt = gen.options[i];
-        const { data: inserted } = await supabase.from("options").insert({
-          decision_id: id, title: opt.title, description: opt.description || null, sort_order: options.length + i,
-        }).select().single();
+        const inserted = await api.options.create(id, {
+          title: opt.title,
+          description: opt.description || null,
+          sort_order: options.length + i,
+        } as any);
         if (inserted && opt.outcomes) {
           for (const oc of opt.outcomes) {
-            await supabase.from("outcomes").insert({
-              option_id: inserted.id, description: oc.description,
+            await api.outcomes.create(inserted.id, {
+              description: oc.description,
               probability: Math.max(0, Math.min(100, oc.probability)),
               impact: Math.max(-10, Math.min(10, oc.impact)),
-            });
+            } as any);
           }
         }
       }
       if (gen.premortems) {
         for (const pm of gen.premortems) {
-          await supabase.from("premortems").insert({
-            decision_id: id, reason: pm.reason, severity: pm.severity || "medium",
-          });
+          await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "medium" } as any);
         }
       }
       await load();
@@ -283,24 +232,21 @@ export default function DecisionWorkspace() {
     if (!id) return;
     setSuggestingOption(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
-        body: { action: "suggest_options", decision: buildContext() },
-      });
-      if (error) throw error;
-      const gen = data.generated;
+      const { generated: gen } = await api.ai.assist("suggest_options", buildContext());
       if (!gen?.title) throw new Error("No option generated");
 
-      const { data: inserted } = await supabase.from("options").insert({
-        decision_id: id, title: gen.title, description: gen.description || null, sort_order: options.length,
-      }).select().single();
-
+      const inserted = await api.options.create(id, {
+        title: gen.title,
+        description: gen.description || null,
+        sort_order: options.length,
+      } as any);
       if (inserted && gen.outcomes) {
         for (const oc of gen.outcomes) {
-          await supabase.from("outcomes").insert({
-            option_id: inserted.id, description: oc.description,
+          await api.outcomes.create(inserted.id, {
+            description: oc.description,
             probability: Math.max(0, Math.min(100, oc.probability)),
             impact: Math.max(-10, Math.min(10, oc.impact)),
-          });
+          } as any);
         }
       }
       await load();
@@ -317,26 +263,19 @@ export default function DecisionWorkspace() {
     const opt = options.find(o => o.id === optionId);
     if (!opt) return;
     try {
-      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
-        body: {
-          action: "suggest_outcomes",
-          decision: {
-            ...buildContext(),
-            target_option_title: opt.title,
-            target_option_outcomes: opt.outcomes.map(oc => ({ description: oc.description })),
-          },
-        },
+      const { generated: gen } = await api.ai.assist("suggest_outcomes", {
+        ...buildContext(),
+        target_option_title: opt.title,
+        target_option_outcomes: opt.outcomes.map(oc => ({ description: oc.description })),
       });
-      if (error) throw error;
-      const gen = data.generated;
       if (!gen?.outcomes) throw new Error("No outcomes generated");
 
       for (const oc of gen.outcomes) {
-        await supabase.from("outcomes").insert({
-          option_id: optionId, description: oc.description,
+        await api.outcomes.create(optionId, {
+          description: oc.description,
           probability: Math.max(0, Math.min(100, oc.probability)),
           impact: Math.max(-10, Math.min(10, oc.impact)),
-        });
+        } as any);
       }
       await load();
       toast({ title: `Added ${gen.outcomes.length} suggested outcomes` });
@@ -350,11 +289,7 @@ export default function DecisionWorkspace() {
   const checkBiases = async () => {
     setCheckingBiases(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
-        body: { action: "check_biases", decision: buildContext() },
-      });
-      if (error) throw error;
-      const gen = data.generated;
+      const { generated: gen } = await api.ai.assist("check_biases", buildContext());
       if (!gen?.biases) throw new Error("No biases found");
       setBiases(gen.biases);
       toast({ title: `Found ${gen.biases.length} potential biases` });
@@ -369,19 +304,11 @@ export default function DecisionWorkspace() {
     if (!id) return;
     setSuggestingPremortems(true);
     try {
-      const { data, error } = await supabase.functions.invoke("ai-decision-assist", {
-        body: { action: "suggest_premortems", decision: buildContext() },
-      });
-      if (error) throw error;
-      const gen = data.generated;
+      const { generated: gen } = await api.ai.assist("suggest_premortems", buildContext());
       if (!gen?.premortems) throw new Error("No premortems generated");
 
       for (const pm of gen.premortems) {
-        await supabase.from("premortems").insert({
-          decision_id: id,
-          reason: pm.reason,
-          severity: pm.severity || "medium",
-        });
+        await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "medium" } as any);
       }
       await load();
       toast({ title: `Added ${gen.premortems.length} potential risks` });
@@ -404,7 +331,6 @@ export default function DecisionWorkspace() {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
-        {/* Main workspace */}
         <div className={`flex-1 transition-all flex flex-col ${showAi ? "mr-80 lg:mr-96" : ""}`}>
           <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -434,11 +360,7 @@ export default function DecisionWorkspace() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button
-                  variant={showAi ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowAi(!showAi)}
-                >
+                <Button variant={showAi ? "default" : "outline"} size="sm" onClick={() => setShowAi(!showAi)}>
                   <Sparkles className="w-4 h-4 mr-1" />
                   <span className="hidden sm:inline">AI Chat</span>
                 </Button>
@@ -447,7 +369,6 @@ export default function DecisionWorkspace() {
           </header>
 
           <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full overflow-y-auto">
-            {/* Title & Context */}
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
               <Input
                 value={title}
@@ -469,11 +390,7 @@ export default function DecisionWorkspace() {
                   {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
                   {generating ? "Generating..." : "Auto-Generate with AI"}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={checkBiases}
-                  disabled={checkingBiases || options.length === 0}
-                >
+                <Button variant="outline" onClick={checkBiases} disabled={checkingBiases || options.length === 0}>
                   {checkingBiases ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
                   {checkingBiases ? "Checking..." : "Check Biases"}
                 </Button>
@@ -486,16 +403,13 @@ export default function DecisionWorkspace() {
               </div>
             </motion.div>
 
-            {/* Tabs */}
             <div className="flex flex-wrap gap-1 p-1 bg-muted rounded-lg w-fit">
               {tabs.map(t => (
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
                   className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                    tab === t.key
-                      ? "bg-card text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
+                    tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {t.icon}
@@ -504,16 +418,9 @@ export default function DecisionWorkspace() {
               ))}
             </div>
 
-            {/* Tab content */}
             <AnimatePresence mode="wait">
               {tab === "options" && (
-                <motion.div
-                  key="options"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="space-y-4"
-                >
+                <motion.div key="options" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
                   <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
                     <SortableContext items={options.map(o => o.id)} strategy={verticalListSortingStrategy}>
                       {options.map((option, i) => (
@@ -541,17 +448,8 @@ export default function DecisionWorkspace() {
                       <Plus className="w-4 h-4 mr-1" />
                       Add Option
                     </Button>
-                    <Button
-                      variant="workspace"
-                      onClick={suggestOption}
-                      disabled={suggestingOption || !title.trim()}
-                      className="flex-1 py-6"
-                    >
-                      {suggestingOption ? (
-                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                      ) : (
-                        <Sparkles className="w-4 h-4 mr-1" />
-                      )}
+                    <Button variant="workspace" onClick={suggestOption} disabled={suggestingOption || !title.trim()} className="flex-1 py-6">
+                      {suggestingOption ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
                       {suggestingOption ? "Suggesting..." : "Suggest Option"}
                     </Button>
                   </div>
@@ -559,12 +457,7 @@ export default function DecisionWorkspace() {
               )}
 
               {tab === "premortem" && (
-                <motion.div
-                  key="premortem"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                >
+                <motion.div key="premortem" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                   <PremortermPanel
                     premortems={premortems}
                     options={options}
@@ -580,172 +473,57 @@ export default function DecisionWorkspace() {
               )}
 
               {tab === "review" && (
-                <motion.div
-                  key="review"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="space-y-6"
-                >
+                <motion.div key="review" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
                   <div className="glass-panel p-6 space-y-4">
-                    <h3 className="font-semibold text-lg">Expected Value Summary</h3>
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <CheckCircle2 className="w-5 h-5 text-primary" />
+                      Decision Review
+                    </h3>
                     {options.length === 0 ? (
-                      <p className="text-muted-foreground text-sm">Add options to see analysis.</p>
+                      <p className="text-muted-foreground text-sm">Add options in the Options tab to review them here.</p>
                     ) : (
                       <div className="space-y-3">
                         {[...options]
                           .sort((a, b) => calcEV(b.outcomes) - calcEV(a.outcomes))
-                          .map((opt) => {
-                            const ev = calcEV(opt.outcomes);
-                            const maxEV = Math.max(...options.map(o => Math.abs(calcEV(o.outcomes))), 1);
-                            const width = Math.abs(ev) / maxEV * 100;
-                            return (
-                              <div key={opt.id} className="space-y-1">
-                                <div className="flex justify-between text-sm">
-                                  <span className="font-medium">{opt.title}</span>
-                                  <span className={`font-mono font-semibold ${ev >= 0 ? "text-success" : "text-destructive"}`}>
-                                    EV: {ev.toFixed(2)}
-                                  </span>
-                                </div>
-                                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full transition-all ${ev >= 0 ? "bg-success" : "bg-destructive"}`}
-                                    style={{ width: `${Math.max(width, 2)}%` }}
-                                  />
-                                </div>
+                          .map((opt, i) => (
+                            <div key={opt.id} className={`flex items-center justify-between p-3 rounded-lg border ${i === 0 ? "border-primary/50 bg-primary/5" : "border-border"}`}>
+                              <div className="flex items-center gap-3">
+                                {i === 0 && <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Best EV</span>}
+                                <span className="font-medium text-sm">{opt.title}</span>
                               </div>
-                            );
-                          })}
+                              <span className={`font-mono text-sm font-semibold ${calcEV(opt.outcomes) >= 0 ? "text-green-600" : "text-destructive"}`}>
+                                EV: {calcEV(opt.outcomes).toFixed(2)}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     )}
-                  </div>
-
-                  {premortems.length > 0 && (
-                    <div className="glass-panel p-6 space-y-3">
-                      <h3 className="font-semibold text-lg flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-warning" />
-                        Risk Summary
-                      </h3>
-                      <div className="space-y-2">
-                        {premortems.filter(p => p.severity === "high").map(p => (
-                          <div key={p.id} className="flex items-start gap-2 text-sm">
-                            <span className="w-2 h-2 rounded-full bg-destructive mt-1.5 shrink-0" />
-                            <span>{p.reason}</span>
-                          </div>
-                        ))}
-                        {premortems.filter(p => p.severity === "medium").map(p => (
-                          <div key={p.id} className="flex items-start gap-2 text-sm">
-                            <span className="w-2 h-2 rounded-full bg-warning mt-1.5 shrink-0" />
-                            <span>{p.reason}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="glass-panel p-6 space-y-3">
-                    <h3 className="font-semibold text-lg">Reflection</h3>
-                    <Textarea
-                      placeholder="What did you learn? What would you do differently?"
-                      value={decision.reflection || ""}
-                      onChange={async (e) => {
-                        setDecision({ ...decision, reflection: e.target.value });
-                        await supabase.from("decisions").update({ reflection: e.target.value }).eq("id", decision.id);
-                      }}
-                      rows={4}
-                    />
                   </div>
                 </motion.div>
               )}
 
               {tab === "actual" && (
-                <motion.div
-                  key="actual"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  className="space-y-6"
-                >
+                <motion.div key="actual" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
                   <div className="glass-panel p-6 space-y-4">
-                    <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
                       <ClipboardCheck className="w-5 h-5 text-primary" />
-                      <h3 className="font-semibold text-lg">Record Actual Outcome</h3>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      After your decision plays out, record what actually happened to calibrate future decisions.
-                    </p>
-
-                    {options.length > 0 && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Which option did you choose?</label>
-                        <select
-                          value={decision.chosen_option_id || ""}
-                          onChange={async (e) => {
-                            const val = e.target.value || null;
-                            setDecision({ ...decision, chosen_option_id: val });
-                            await supabase.from("decisions").update({ chosen_option_id: val }).eq("id", decision.id);
-                          }}
-                          className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
-                        >
-                          <option value="">— Not yet decided —</option>
-                          {options.map(o => (
-                            <option key={o.id} value={o.id}>{o.title}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">When did the outcome become clear?</label>
-                      <Input
-                        type="date"
-                        value={decision.outcome_date ? new Date(decision.outcome_date).toISOString().split("T")[0] : ""}
-                        onChange={async (e) => {
-                          const val = e.target.value ? new Date(e.target.value).toISOString() : null;
-                          setDecision({ ...decision, outcome_date: val });
-                          await supabase.from("decisions").update({ outcome_date: val }).eq("id", decision.id);
-                        }}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">What actually happened?</label>
-                      <Textarea
-                        placeholder="Describe the actual outcome — what went right, what went wrong, any surprises..."
-                        value={decision.actual_outcome || ""}
-                        onChange={async (e) => {
-                          setDecision({ ...decision, actual_outcome: e.target.value });
-                          await supabase.from("decisions").update({ actual_outcome: e.target.value }).eq("id", decision.id);
-                        }}
-                        rows={5}
-                      />
-                    </div>
-
-                    {decision.chosen_option_id && (
-                      <div className="glass-panel p-4 space-y-2 bg-muted/30">
-                        <h4 className="text-sm font-medium">Predicted vs Actual</h4>
-                        <p className="text-xs text-muted-foreground">
-                          You chose: <span className="font-semibold text-foreground">{options.find(o => o.id === decision.chosen_option_id)?.title}</span>
-                        </p>
-                        {(() => {
-                          const chosen = options.find(o => o.id === decision.chosen_option_id);
-                          if (!chosen || chosen.outcomes.length === 0) return null;
-                          return (
-                            <div className="space-y-1 mt-2">
-                              <p className="text-xs font-medium text-muted-foreground">Predicted outcomes:</p>
-                              {chosen.outcomes.map(oc => (
-                                <div key={oc.id} className="text-xs flex justify-between">
-                                  <span>{oc.description}</span>
-                                  <span className="font-mono text-muted-foreground">
-                                    {Number(oc.probability)}% · {Number(oc.impact) > 0 ? "+" : ""}{Number(oc.impact)}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
+                      Actual Outcome
+                    </h3>
+                    <p className="text-sm text-muted-foreground">Record what actually happened after making this decision.</p>
+                    <Textarea
+                      value={decision.actualOutcome || ""}
+                      onChange={(e) => setDecision({ ...decision, actualOutcome: e.target.value })}
+                      onBlur={() => id && api.decisions.update(id, { actualOutcome: decision.actualOutcome })}
+                      placeholder="What actually happened? How did it turn out?"
+                      rows={4}
+                    />
+                    <Textarea
+                      value={decision.reflection || ""}
+                      onChange={(e) => setDecision({ ...decision, reflection: e.target.value })}
+                      onBlur={() => id && api.decisions.update(id, { reflection: decision.reflection })}
+                      placeholder="Reflection: What did you learn? Would you make the same decision again?"
+                      rows={3}
+                    />
                   </div>
                 </motion.div>
               )}
@@ -753,24 +531,16 @@ export default function DecisionWorkspace() {
           </div>
         </div>
 
-        {/* AI Panel */}
-        <AnimatePresence>
-          {showAi && (
-            <motion.div
-              initial={{ x: 320, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 320, opacity: 0 }}
-              className="fixed right-0 top-0 bottom-0 w-80 lg:w-96 border-l border-border bg-card z-20"
-            >
-              <AiPanel
-                decision={decision}
-                options={options}
-                premortems={premortems}
-                onClose={() => setShowAi(false)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {showAi && (
+          <div className="fixed right-0 top-0 h-full w-80 lg:w-96 border-l border-border bg-background z-20 flex flex-col">
+            <AiPanel
+              decision={decision}
+              options={options}
+              premortems={premortems}
+              onClose={() => setShowAi(false)}
+            />
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );

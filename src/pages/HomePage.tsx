@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { api } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,22 +20,13 @@ export default function HomePage() {
 
     setCreating(true);
     try {
-      // Use the input as both title (first line or truncated) and context
       const lines = text.split("\n");
       const title = lines[0].slice(0, 100) || "Untitled Decision";
       const context = text;
 
-      const { data, error } = await supabase
-        .from("decisions")
-        .insert({ title, context, user_id: user.id })
-        .select()
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        window.dispatchEvent(new Event("decisions-updated"));
-        navigate(`/decision/${data.id}`);
-      }
+      const data = await api.decisions.create({ title, context });
+      window.dispatchEvent(new Event("decisions-updated"));
+      navigate(`/decision/${data.id}`);
     } catch {
       // fallback
     } finally {
