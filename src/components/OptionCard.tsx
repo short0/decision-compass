@@ -19,10 +19,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import type { Database } from "@/integrations/supabase/types";
-
-type Option = Database["public"]["Tables"]["options"]["Row"];
-type Outcome = Database["public"]["Tables"]["outcomes"]["Row"];
+import type { Option, Outcome } from "@/lib/api";
 
 export interface BiasAnnotation {
   bias_name: string;

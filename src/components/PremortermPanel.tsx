@@ -17,11 +17,8 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Database } from "@/integrations/supabase/types";
+import type { Option, Premortem } from "@/lib/api";
 import type { BiasAnnotation } from "@/components/OptionCard";
-
-type Option = Database["public"]["Tables"]["options"]["Row"];
-type Premortem = Database["public"]["Tables"]["premortems"]["Row"];
 
 interface Props {
   premortems: Premortem[];
