@@ -3,6 +3,11 @@ import OpenAI from "openai";
 
 export const aiRouter = Router();
 
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
+
 function requireAuth(req: any, res: any, next: any) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -210,10 +215,6 @@ function buildUserContent(action: string, decision: any) {
 
 aiRouter.post("/assist", async (req, res) => {
   const { action, decision } = req.body;
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: "OPENAI_API_KEY is not configured" });
-  }
 
   const systemPrompt = systemPrompts[action];
   if (!systemPrompt) {
@@ -221,11 +222,10 @@ aiRouter.post("/assist", async (req, res) => {
   }
 
   try {
-    const client = new OpenAI({ apiKey });
     const tool = tools[action];
     const toolName = toolNames[action];
 
-    const response = await client.chat.completions.create({
+    const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
@@ -252,10 +252,6 @@ aiRouter.post("/assist", async (req, res) => {
 
 aiRouter.post("/chat", async (req, res) => {
   const { messages, decision_context } = req.body;
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: "OPENAI_API_KEY is not configured" });
-  }
 
   const systemPrompt = `You are a decision analysis assistant. You help users think through decisions clearly.
 
@@ -270,9 +266,7 @@ RULES:
 - Use markdown sparingly.`;
 
   try {
-    const client = new OpenAI({ apiKey });
-
-    const stream = await client.chat.completions.create({
+    const stream = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [{ role: "system", content: systemPrompt }, ...messages],
       stream: true,
