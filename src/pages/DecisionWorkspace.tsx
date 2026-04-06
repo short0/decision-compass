@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Trash2, Sparkles, CheckCircle2, Target, Shield, Wand2, Loader2,
-  Brain, X, ClipboardCheck,
+  Brain, X, ClipboardCheck, TrendingUp, AlertTriangle,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
@@ -17,7 +17,7 @@ import AiPanel from "@/components/AiPanel";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -46,6 +46,11 @@ export default function DecisionWorkspace() {
   const [biases, setBiases] = useState<BiasAnnotation[]>([]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  // Clear biases when switching decisions
+  useEffect(() => {
+    setBiases([]);
+  }, [id]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -101,7 +106,11 @@ export default function DecisionWorkspace() {
   };
 
   const addOutcome = async (optionId: string) => {
-    await api.outcomes.create(optionId, { description: "New outcome" } as any);
+    const opt = options.find(o => o.id === optionId);
+    await api.outcomes.create(optionId, {
+      description: "New outcome",
+      sortOrder: opt ? opt.outcomes.length : 0,
+    } as any);
     load();
   };
 
@@ -114,53 +123,47 @@ export default function DecisionWorkspace() {
     load();
   };
 
-  const reorderOutcomes = async (optionId: string, activeId: string, overId: string) => {
-    const opt = options.find(o => o.id === optionId);
-    if (!opt) return;
-    const ocs = [...opt.outcomes];
-    const activeIdx = ocs.findIndex(o => o.id === activeId);
-    const overIdx = ocs.findIndex(o => o.id === overId);
-    if (activeIdx === -1 || overIdx === -1) return;
-    const a = ocs[activeIdx];
-    const b = ocs[overIdx];
-    await api.outcomes.update(a.id, { description: b.description, probability: b.probability, impact: b.impact });
-    await api.outcomes.update(b.id, { description: a.description, probability: a.probability, impact: a.impact });
-    load();
+  const reorderOutcomes = async (optionId: string, reordered: Outcome[]) => {
+    setOptions(prev => prev.map(o =>
+      o.id === optionId ? { ...o, outcomes: reordered } : o
+    ));
+    await Promise.all(
+      reordered.map((oc, idx) => api.outcomes.update(oc.id, { sortOrder: idx } as any))
+    );
   };
 
   const handleOptionDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    const activeIdx = options.findIndex(o => o.id === active.id);
-    const overIdx = options.findIndex(o => o.id === over.id);
-    if (activeIdx === -1 || overIdx === -1) return;
-    const a = options[activeIdx];
-    const b = options[overIdx];
-    Promise.all([
-      api.options.update(a.id, { sortOrder: b.sortOrder } as any),
-      api.options.update(b.id, { sortOrder: a.sortOrder } as any),
-    ]).then(() => load());
+    const oldIndex = options.findIndex(o => o.id === active.id);
+    const newIndex = options.findIndex(o => o.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(options, oldIndex, newIndex);
+    setOptions(reordered);
+    Promise.all(
+      reordered.map((opt, idx) => api.options.update(opt.id, { sortOrder: idx } as any))
+    );
   };
 
-  const reorderPremortems = async (activeId: string, overId: string) => {
-    const activeIdx = premortems.findIndex(p => p.id === activeId);
-    const overIdx = premortems.findIndex(p => p.id === overId);
-    if (activeIdx === -1 || overIdx === -1) return;
-    const a = premortems[activeIdx];
-    const b = premortems[overIdx];
-    await api.premortems.update(a.id, { reason: b.reason, severity: b.severity });
-    await api.premortems.update(b.id, { reason: a.reason, severity: a.severity });
-    load();
+  const reorderPremortems = async (reordered: Premortem[]) => {
+    setPremortems(reordered);
+    await Promise.all(
+      reordered.map((pm, idx) => api.premortems.update(pm.id, { sortOrder: idx } as any))
+    );
   };
 
   const addPremortem = async (optionId?: string) => {
     if (!id) return;
-    await api.premortems.create(id, { option_id: optionId || null } as any);
+    await api.premortems.create(id, {
+      option_id: optionId || null,
+      sortOrder: premortems.length,
+    } as any);
     load();
   };
 
   const updatePremortem = async (pmId: string, updates: Partial<Premortem>) => {
     await api.premortems.update(pmId, updates);
+    setPremortems(prev => prev.map(p => p.id === pmId ? { ...p, ...updates } : p));
   };
 
   const deletePremortem = async (pmId: string) => {
@@ -328,6 +331,10 @@ export default function DecisionWorkspace() {
 
   if (!decision) return null;
 
+  const sortedByEV = [...options].sort((a, b) => calcEV(b.outcomes) - calcEV(a.outcomes));
+  const highRisks = premortems.filter(p => p.severity === "high" || p.severity === "critical");
+  const frequentRisks = premortems.filter(p => p.frequency === "likely" || p.frequency === "almost certain");
+
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
@@ -376,6 +383,7 @@ export default function DecisionWorkspace() {
                 onBlur={saveDecision}
                 className="text-2xl font-bold border-none bg-transparent px-0 focus-visible:ring-0 h-auto"
                 placeholder="What decision are you making?"
+                data-testid="input-decision-title"
               />
               <Textarea
                 value={context}
@@ -384,13 +392,14 @@ export default function DecisionWorkspace() {
                 className="border-none bg-transparent px-0 focus-visible:ring-0 resize-none text-muted-foreground"
                 placeholder="Describe the context and constraints..."
                 rows={2}
+                data-testid="input-decision-context"
               />
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={autoGenerate} disabled={generating || !title.trim()}>
+                <Button variant="outline" onClick={autoGenerate} disabled={generating || !title.trim()} data-testid="button-auto-generate">
                   {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
                   {generating ? "Generating..." : "Auto-Generate with AI"}
                 </Button>
-                <Button variant="outline" onClick={checkBiases} disabled={checkingBiases || options.length === 0}>
+                <Button variant="outline" onClick={checkBiases} disabled={checkingBiases || options.length === 0} data-testid="button-check-biases">
                   {checkingBiases ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
                   {checkingBiases ? "Checking..." : "Check Biases"}
                 </Button>
@@ -408,6 +417,7 @@ export default function DecisionWorkspace() {
                 <button
                   key={t.key}
                   onClick={() => setTab(t.key)}
+                  data-testid={`button-tab-${t.key}`}
                   className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                     tab === t.key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}
@@ -436,7 +446,7 @@ export default function DecisionWorkspace() {
                           onAddOutcome={() => addOutcome(option.id)}
                           onUpdateOutcome={updateOutcome}
                           onDeleteOutcome={deleteOutcome}
-                          onReorderOutcomes={(activeId, overId) => reorderOutcomes(option.id, activeId, overId)}
+                          onReorderOutcomes={(reordered) => reorderOutcomes(option.id, reordered)}
                           onSuggestOutcomes={suggestOutcomes}
                           suggestingOutcomes={suggestingOutcomesFor === option.id}
                         />
@@ -444,11 +454,11 @@ export default function DecisionWorkspace() {
                     </SortableContext>
                   </DndContext>
                   <div className="flex gap-2">
-                    <Button variant="workspace" onClick={addOption} className="flex-1 py-6">
+                    <Button variant="workspace" onClick={addOption} className="flex-1 py-6" data-testid="button-add-option">
                       <Plus className="w-4 h-4 mr-1" />
                       Add Option
                     </Button>
-                    <Button variant="workspace" onClick={suggestOption} disabled={suggestingOption || !title.trim()} className="flex-1 py-6">
+                    <Button variant="workspace" onClick={suggestOption} disabled={suggestingOption || !title.trim()} className="flex-1 py-6" data-testid="button-suggest-option">
                       {suggestingOption ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
                       {suggestingOption ? "Suggesting..." : "Suggest Option"}
                     </Button>
@@ -474,28 +484,113 @@ export default function DecisionWorkspace() {
 
               {tab === "review" && (
                 <motion.div key="review" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
+                  {/* Expected Value Summary */}
                   <div className="glass-panel p-6 space-y-4">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
-                      <CheckCircle2 className="w-5 h-5 text-primary" />
-                      Decision Review
+                      <TrendingUp className="w-5 h-5 text-primary" />
+                      Expected Value Summary
                     </h3>
                     {options.length === 0 ? (
-                      <p className="text-muted-foreground text-sm">Add options in the Options tab to review them here.</p>
+                      <p className="text-muted-foreground text-sm">Add options in the Options tab to compare expected values.</p>
                     ) : (
                       <div className="space-y-3">
-                        {[...options]
-                          .sort((a, b) => calcEV(b.outcomes) - calcEV(a.outcomes))
-                          .map((opt, i) => (
-                            <div key={opt.id} className={`flex items-center justify-between p-3 rounded-lg border ${i === 0 ? "border-primary/50 bg-primary/5" : "border-border"}`}>
-                              <div className="flex items-center gap-3">
-                                {i === 0 && <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Best EV</span>}
-                                <span className="font-medium text-sm">{opt.title}</span>
+                        {sortedByEV.map((opt, i) => {
+                          const ev = calcEV(opt.outcomes);
+                          const maxEV = calcEV(sortedByEV[0].outcomes);
+                          const barWidth = maxEV !== 0 ? Math.abs(ev / maxEV) * 100 : 0;
+                          return (
+                            <div key={opt.id} className={`p-3 rounded-lg border space-y-2 ${i === 0 ? "border-primary/50 bg-primary/5" : "border-border"}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {i === 0 && <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">Best EV</span>}
+                                  <span className="font-medium text-sm">{opt.title}</span>
+                                </div>
+                                <span className={`font-mono text-sm font-semibold ${ev >= 0 ? "text-green-600 dark:text-green-400" : "text-destructive"}`}>
+                                  EV: {ev.toFixed(2)}
+                                </span>
                               </div>
-                              <span className={`font-mono text-sm font-semibold ${calcEV(opt.outcomes) >= 0 ? "text-green-600" : "text-destructive"}`}>
-                                EV: {calcEV(opt.outcomes).toFixed(2)}
-                              </span>
+                              <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all ${ev >= 0 ? "bg-green-500" : "bg-destructive"}`}
+                                  style={{ width: `${barWidth}%` }}
+                                />
+                              </div>
+                              {opt.outcomes.length > 0 && (
+                                <div className="text-xs text-muted-foreground space-y-0.5">
+                                  {opt.outcomes.map(oc => (
+                                    <div key={oc.id} className="flex justify-between">
+                                      <span className="truncate max-w-xs">{oc.description}</span>
+                                      <span className="font-mono ml-2 shrink-0">{Number(oc.probability)}% × {Number(oc.impact) >= 0 ? "+" : ""}{Number(oc.impact)}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Risk Summary */}
+                  <div className="glass-panel p-6 space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <AlertTriangle className="w-5 h-5 text-warning" />
+                      Risk Summary
+                    </h3>
+                    {premortems.length === 0 ? (
+                      <p className="text-muted-foreground text-sm">Add premortem risks in the Premortem tab to see them summarized here.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {(highRisks.length > 0 || frequentRisks.length > 0) && (
+                          <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
+                            <p className="text-xs font-semibold text-destructive uppercase tracking-wide">Top Concerns</p>
+                            {[...new Set([...highRisks, ...frequentRisks])].slice(0, 4).map(pm => (
+                              <div key={pm.id} className="flex items-start gap-2 text-sm">
+                                <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium mt-0.5 ${
+                                  pm.severity === "critical" ? "bg-destructive/20 text-destructive" :
+                                  pm.severity === "high" ? "bg-destructive/10 text-destructive" :
+                                  "bg-warning/10 text-warning"
+                                }`}>{pm.severity}</span>
+                                <span className="text-muted-foreground leading-snug">{pm.reason}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                          {["low", "medium", "high"].map(sev => {
+                            const count = premortems.filter(p => p.severity === sev).length;
+                            return (
+                              <div key={sev} className={`p-3 rounded-lg border ${
+                                sev === "high" ? "border-destructive/30 bg-destructive/5" :
+                                sev === "medium" ? "border-warning/30 bg-warning/5" :
+                                "border-border bg-muted/30"
+                              }`}>
+                                <p className="text-2xl font-bold">{count}</p>
+                                <p className="text-xs text-muted-foreground capitalize">{sev} severity</p>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="space-y-1">
+                          {premortems.map(pm => (
+                            <div key={pm.id} className="flex items-center gap-2 text-sm py-1 border-b border-border/50 last:border-0">
+                              <span className={`shrink-0 w-16 text-center text-xs px-1.5 py-0.5 rounded font-medium ${
+                                pm.severity === "critical" ? "bg-destructive/20 text-destructive" :
+                                pm.severity === "high" ? "bg-destructive/10 text-destructive" :
+                                pm.severity === "medium" ? "bg-warning/10 text-warning" :
+                                "bg-muted text-muted-foreground"
+                              }`}>{pm.severity}</span>
+                              <span className={`shrink-0 w-24 text-center text-xs px-1.5 py-0.5 rounded font-medium ${
+                                pm.frequency === "almost certain" ? "bg-destructive/10 text-destructive" :
+                                pm.frequency === "likely" ? "bg-warning/10 text-warning" :
+                                pm.frequency === "occasional" ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" :
+                                "bg-muted text-muted-foreground"
+                              }`}>{pm.frequency}</span>
+                              <span className="text-muted-foreground text-xs leading-snug truncate">{pm.reason}</span>
                             </div>
                           ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -516,6 +611,7 @@ export default function DecisionWorkspace() {
                       onBlur={() => id && api.decisions.update(id, { actualOutcome: decision.actualOutcome })}
                       placeholder="What actually happened? How did it turn out?"
                       rows={4}
+                      data-testid="input-actual-outcome"
                     />
                     <Textarea
                       value={decision.reflection || ""}
@@ -523,6 +619,7 @@ export default function DecisionWorkspace() {
                       onBlur={() => id && api.decisions.update(id, { reflection: decision.reflection })}
                       placeholder="Reflection: What did you learn? Would you make the same decision again?"
                       rows={3}
+                      data-testid="input-reflection"
                     />
                   </div>
                 </motion.div>

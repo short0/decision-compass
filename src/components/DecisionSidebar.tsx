@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, type Decision } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User } from "lucide-react";
+import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DecisionSidebar() {
@@ -59,32 +59,48 @@ export default function DecisionSidebar() {
   return (
     <div className="w-64 border-r border-border bg-sidebar-background flex flex-col shrink-0 h-full">
       <div className="p-3 border-b border-border flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => navigate("/")}
+          className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          data-testid="link-home-logo"
+        >
           <Scale className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm">Decy</span>
-        </div>
+        </button>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsed(true)}>
           <PanelLeftClose className="w-4 h-4" />
         </Button>
       </div>
 
-      <div className="p-2">
+      <div className="p-2 space-y-1 border-b border-border">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start text-xs"
+          onClick={() => navigate("/")}
+          data-testid="button-home"
+        >
+          <Home className="w-3 h-3 mr-1" />
+          Home
+        </Button>
         <Button
           variant="outline"
           size="sm"
           className="w-full justify-start text-xs"
           onClick={() => navigate("/")}
+          data-testid="button-new-decision"
         >
           <Plus className="w-3 h-3 mr-1" />
           New Decision
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
+      <div className="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
         {decisions.map(d => (
           <div
             key={d.id}
             onClick={() => navigate(`/decision/${d.id}`)}
+            data-testid={`link-decision-${d.id}`}
             className={`group flex items-center justify-between px-2 py-1.5 rounded-md text-xs cursor-pointer transition-colors ${
               activeId === d.id
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
@@ -97,6 +113,7 @@ export default function DecisionSidebar() {
               size="icon"
               className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
               onClick={(e) => deleteDecision(e, d.id)}
+              data-testid={`button-delete-decision-${d.id}`}
             >
               <Trash2 className="w-3 h-3" />
             </Button>
@@ -105,14 +122,29 @@ export default function DecisionSidebar() {
       </div>
 
       <div className="p-2 border-t border-border space-y-1">
-        <ThemeToggle />
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-muted-foreground">Theme</span>
+          <ThemeToggle />
+        </div>
         {isGuest ? (
-          <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={() => navigate("/auth")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-xs"
+            onClick={() => navigate("/auth")}
+            data-testid="button-signin"
+          >
             <User className="w-3 h-3 mr-1" />
             Sign In / Sign Up
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" className="w-full justify-start text-xs" onClick={handleSignOut}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-start text-xs"
+            onClick={handleSignOut}
+            data-testid="button-signout"
+          >
             <LogOut className="w-3 h-3 mr-1" />
             Sign Out
           </Button>

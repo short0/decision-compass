@@ -27,6 +27,7 @@ export type Outcome = {
   description: string;
   probability: string | number;
   impact: string | number;
+  sortOrder: number;
   createdAt: string;
 };
 
@@ -36,6 +37,8 @@ export type Premortem = {
   optionId: string | null;
   reason: string;
   severity: string;
+  frequency: string;
+  sortOrder: number;
   createdAt: string;
 };
 

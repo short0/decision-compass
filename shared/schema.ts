@@ -1,4 +1,4 @@
-import { pgTable, text, uuid, timestamp, numeric, integer, check } from "drizzle-orm/pg-core";
+import { pgTable, text, uuid, timestamp, numeric, integer } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const decisions = pgTable("decisions", {
@@ -30,6 +30,7 @@ export const outcomes = pgTable("outcomes", {
   description: text("description").notNull(),
   probability: numeric("probability").notNull().default("50"),
   impact: numeric("impact").notNull().default("0"),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -39,6 +40,8 @@ export const premortems = pgTable("premortems", {
   optionId: uuid("option_id").references(() => options.id, { onDelete: "cascade" }),
   reason: text("reason").notNull(),
   severity: text("severity").notNull().default("medium"),
+  frequency: text("frequency").notNull().default("occasional"),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

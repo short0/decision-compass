@@ -88,7 +88,7 @@ decisionsRouter.get("/:id/options", async (req, res) => {
   const optIds = opts.map((o) => o.id);
   let allOutcomes: any[] = [];
   if (optIds.length > 0) {
-    allOutcomes = await db.select().from(outcomes).where(inArray(outcomes.optionId, optIds));
+    allOutcomes = await db.select().from(outcomes).where(inArray(outcomes.optionId, optIds)).orderBy(outcomes.sortOrder);
   }
   const result = opts.map((o) => ({
     ...o,
@@ -120,7 +120,6 @@ decisionsRouter.patch("/options/:optionId", async (req, res) => {
   const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
-  const allowed = ["title", "description", "sortOrder", "sort_order"];
   const updates: any = {};
   if ("title" in req.body) updates.title = req.body.title;
   if ("description" in req.body) updates.description = req.body.description;
@@ -149,7 +148,7 @@ decisionsRouter.post("/options/:optionId/outcomes", async (req, res) => {
   const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
-  const { description, probability, impact } = req.body;
+  const { description, probability, impact, sort_order } = req.body;
   const [oc] = await db
     .insert(outcomes)
     .values({
@@ -157,6 +156,7 @@ decisionsRouter.post("/options/:optionId/outcomes", async (req, res) => {
       description: description || "New outcome",
       probability: probability != null ? String(probability) : "50",
       impact: impact != null ? String(impact) : "0",
+      sortOrder: sort_order ?? 0,
     })
     .returning();
   res.json(oc);
@@ -173,6 +173,7 @@ decisionsRouter.patch("/outcomes/:outcomeId", async (req, res) => {
   if ("description" in req.body) updates.description = req.body.description;
   if ("probability" in req.body) updates.probability = String(req.body.probability);
   if ("impact" in req.body) updates.impact = String(req.body.impact);
+  if ("sortOrder" in req.body) updates.sortOrder = req.body.sortOrder;
 
   const [updated] = await db.update(outcomes).set(updates).where(eq(outcomes.id, req.params.outcomeId)).returning();
   res.json(updated);
@@ -193,7 +194,7 @@ decisionsRouter.get("/:id/premortems", async (req, res) => {
   const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
-  const rows = await db.select().from(premortems).where(eq(premortems.decisionId, req.params.id));
+  const rows = await db.select().from(premortems).where(eq(premortems.decisionId, req.params.id)).orderBy(premortems.sortOrder);
   res.json(rows);
 });
 
@@ -201,7 +202,7 @@ decisionsRouter.post("/:id/premortems", async (req, res) => {
   const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
-  const { reason, severity, option_id } = req.body;
+  const { reason, severity, frequency, option_id, sort_order } = req.body;
   const [pm] = await db
     .insert(premortems)
     .values({
@@ -209,6 +210,8 @@ decisionsRouter.post("/:id/premortems", async (req, res) => {
       optionId: option_id || null,
       reason: reason || "What could go wrong?",
       severity: severity || "medium",
+      frequency: frequency || "occasional",
+      sortOrder: sort_order ?? 0,
     })
     .returning();
   res.json(pm);
@@ -223,6 +226,8 @@ decisionsRouter.patch("/premortems/:pmId", async (req, res) => {
   const updates: any = {};
   if ("reason" in req.body) updates.reason = req.body.reason;
   if ("severity" in req.body) updates.severity = req.body.severity;
+  if ("frequency" in req.body) updates.frequency = req.body.frequency;
+  if ("sortOrder" in req.body) updates.sortOrder = req.body.sortOrder;
 
   const [updated] = await db.update(premortems).set(updates).where(eq(premortems.id, req.params.pmId)).returning();
   res.json(updated);
