@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, GripVertical } from "lucide-react";
@@ -46,11 +46,11 @@ interface Props {
 
 function useAutoResize(value: string) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
   }, [value]);
   return ref;
 }
@@ -61,6 +61,7 @@ export default function OptionCard({
   onReorderOutcomes, onSuggestOutcomes, suggestingOutcomes,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
+  const [overflowVisible, setOverflowVisible] = useState(false);
   const [title, setTitle] = useState(option.title);
   const [localOutcomes, setLocalOutcomes] = useState(option.outcomes);
 
@@ -102,11 +103,20 @@ export default function OptionCard({
     b => b.target_type === "option" && option.title.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
   );
 
+  const handleExpandToggle = () => {
+    if (expanded) {
+      setOverflowVisible(false);
+      setExpanded(false);
+    } else {
+      setExpanded(true);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`glass-panel overflow-visible ${optionBias ? "ring-1 ring-warning/50" : ""}`}
+      className={`glass-panel ${optionBias ? "ring-1 ring-warning/50" : ""}`}
     >
       <div className="p-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -132,9 +142,9 @@ export default function OptionCard({
                     ⚠ {optionBias.bias_name}
                   </span>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="max-w-sm z-50" sideOffset={4}>
+                <TooltipContent side="top" className="max-w-[300px] z-[100]" sideOffset={4}>
                   <p className="text-sm font-semibold mb-1">{optionBias.bias_name}</p>
-                  <p className="text-xs leading-relaxed">{optionBias.explanation}</p>
+                  <p className="text-xs leading-relaxed break-words">{optionBias.explanation}</p>
                 </TooltipContent>
               </Tooltip>
             )}
@@ -147,12 +157,12 @@ export default function OptionCard({
                 EV: {ev.toFixed(2)}
               </span>
             </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs z-50" sideOffset={4}>
+            <TooltipContent side="top" className="max-w-[280px] z-[100]" sideOffset={4}>
               <p className="text-sm font-semibold mb-1">Expected Value (EV)</p>
               <p className="text-xs text-muted-foreground leading-relaxed">Sum of each outcome's probability × impact. Higher EV = better risk-adjusted choice.</p>
             </TooltipContent>
           </Tooltip>
-          <Button variant="ghost" size="icon" onClick={() => setExpanded(!expanded)}>
+          <Button variant="ghost" size="icon" onClick={handleExpandToggle}>
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
           <Button variant="ghost" size="icon" onClick={onDelete}>
@@ -167,7 +177,8 @@ export default function OptionCard({
             initial={{ height: 0 }}
             animate={{ height: "auto" }}
             exit={{ height: 0 }}
-            className="overflow-hidden"
+            style={{ overflow: overflowVisible ? "visible" : "hidden" }}
+            onAnimationComplete={() => setOverflowVisible(true)}
           >
             <div className="px-4 pb-4 space-y-2">
               {localOutcomes.length > 0 && (
@@ -178,7 +189,7 @@ export default function OptionCard({
                     <TooltipTrigger asChild>
                       <span className="text-center cursor-help underline decoration-dotted">Prob %</span>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs z-50" sideOffset={4}>
+                    <TooltipContent side="top" className="max-w-[280px] z-[100]" sideOffset={4}>
                       <p className="text-sm font-semibold mb-1">Probability (0–100%)</p>
                       <p className="text-xs text-muted-foreground leading-relaxed">How likely this outcome is to occur. All probabilities for an option should sum to 100%.</p>
                     </TooltipContent>
@@ -187,7 +198,7 @@ export default function OptionCard({
                     <TooltipTrigger asChild>
                       <span className="text-center cursor-help underline decoration-dotted">Impact</span>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs z-50" sideOffset={4}>
+                    <TooltipContent side="top" className="max-w-[280px] z-[100]" sideOffset={4}>
                       <p className="text-sm font-semibold mb-1">Impact (−10 to +10)</p>
                       <p className="text-xs text-muted-foreground leading-relaxed">How good or bad this outcome would be. Negative = harmful, positive = beneficial.</p>
                     </TooltipContent>
@@ -298,10 +309,9 @@ function SortableOutcomeRow({
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onBlur={() => onUpdate(outcome.id, { description: desc })}
-          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 overflow-hidden resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
+          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
           placeholder="Describe outcome..."
-          rows={1}
-          style={{ minHeight: "36px" }}
+          style={{ overflowY: "hidden", minHeight: "36px" }}
         />
         <Input
           type="number"
@@ -340,14 +350,12 @@ function SortableOutcomeRow({
           </Button>
         </div>
         <textarea
-          ref={descRef}
           value={desc}
           onChange={(e) => setDesc(e.target.value)}
           onBlur={() => onUpdate(outcome.id, { description: desc })}
-          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 overflow-hidden resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
+          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
           placeholder="Describe outcome..."
-          rows={2}
-          style={{ minHeight: "54px" }}
+          style={{ overflowY: "hidden", minHeight: "54px" }}
         />
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -384,9 +392,9 @@ function SortableOutcomeRow({
               ⚠ {bias.bias_name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-sm z-50" sideOffset={4}>
+          <TooltipContent side="top" className="max-w-[300px] z-[100]" sideOffset={4}>
             <p className="text-sm font-semibold mb-1">{bias.bias_name}</p>
-            <p className="text-xs leading-relaxed">{bias.explanation}</p>
+            <p className="text-xs leading-relaxed break-words">{bias.explanation}</p>
           </TooltipContent>
         </Tooltip>
       )}

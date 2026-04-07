@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, type Decision, type Option, type Outcome, type Premortem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -8,11 +8,11 @@ import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Trash2, Sparkles, CheckCircle2, Target, Shield, Wand2, Loader2,
-  Brain, X, ClipboardCheck, TrendingUp, AlertTriangle,
+  Brain, X, ClipboardCheck, TrendingUp, AlertTriangle, Undo2, Redo2,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
-import PremortermPanel from "@/components/PremortermPanel";
+import PremortermPanel, { getRiskScore } from "@/components/PremortermPanel";
 import AiPanel from "@/components/AiPanel";
 import {
   DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent,
@@ -24,6 +24,12 @@ import {
 } from "@/components/ui/alert-dialog";
 
 type Tab = "options" | "premortem" | "review" | "actual";
+
+type Command = {
+  execute: () => Promise<void>;
+  unexecute: () => Promise<void>;
+  description: string;
+};
 
 export default function DecisionWorkspace() {
   const { id } = useParams<{ id: string }>();
@@ -37,7 +43,6 @@ export default function DecisionWorkspace() {
   const [title, setTitle] = useState("");
   const [context, setContext] = useState("");
   const [showAi, setShowAi] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [suggestingOption, setSuggestingOption] = useState(false);
   const [suggestingOutcomesFor, setSuggestingOutcomesFor] = useState<string | null>(null);
@@ -45,12 +50,14 @@ export default function DecisionWorkspace() {
   const [suggestingPremortems, setSuggestingPremortems] = useState(false);
   const [biases, setBiases] = useState<BiasAnnotation[]>([]);
 
+  const undoStack = useRef<Command[]>([]);
+  const redoStack = useRef<Command[]>([]);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  // Clear biases when switching decisions
-  useEffect(() => {
-    setBiases([]);
-  }, [id]);
+  useEffect(() => { setBiases([]); }, [id]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -71,12 +78,52 @@ export default function DecisionWorkspace() {
 
   useEffect(() => { load(); }, [load]);
 
+  const syncUndo = () => {
+    setCanUndo(undoStack.current.length > 0);
+    setCanRedo(redoStack.current.length > 0);
+  };
+
+  const executeCommand = async (cmd: Command) => {
+    await cmd.execute();
+    undoStack.current = [...undoStack.current, cmd].slice(-20);
+    redoStack.current = [];
+    syncUndo();
+  };
+
+  const handleUndo = async () => {
+    const cmd = undoStack.current.at(-1);
+    if (!cmd) return;
+    undoStack.current = undoStack.current.slice(0, -1);
+    await cmd.unexecute();
+    redoStack.current = [...redoStack.current, cmd].slice(-20);
+    syncUndo();
+    toast({ title: `Undid: ${cmd.description}` });
+  };
+
+  const handleRedo = async () => {
+    const cmd = redoStack.current.at(-1);
+    if (!cmd) return;
+    redoStack.current = redoStack.current.slice(0, -1);
+    await cmd.execute();
+    undoStack.current = [...undoStack.current, cmd].slice(-20);
+    syncUndo();
+    toast({ title: `Redid: ${cmd.description}` });
+  };
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) { e.preventDefault(); handleUndo(); }
+      if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.key === "z" && e.shiftKey))) { e.preventDefault(); handleRedo(); }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
   const saveDecision = async () => {
     if (!id) return;
-    setSaving(true);
     await api.decisions.update(id, { title, context: context || null });
     window.dispatchEvent(new Event("decisions-updated"));
-    setSaving(false);
   };
 
   const deleteDecision = async () => {
@@ -89,16 +136,44 @@ export default function DecisionWorkspace() {
 
   const addOption = async () => {
     if (!id) return;
-    await api.options.create(id, {
-      title: `Option ${options.length + 1}`,
-      sortOrder: options.length,
-    } as any);
-    load();
+    let createdId: string | null = null;
+    const sortOrder = options.length;
+    const cmd: Command = {
+      description: "Add option",
+      execute: async () => {
+        const created = await api.options.create(id, { title: `Option ${sortOrder + 1}`, sortOrder } as any);
+        createdId = created.id;
+        await load();
+      },
+      unexecute: async () => {
+        if (createdId) { await api.options.delete(createdId); createdId = null; await load(); }
+      },
+    };
+    await executeCommand(cmd);
   };
 
   const deleteOption = async (optionId: string) => {
-    await api.options.delete(optionId);
-    load();
+    const optionData = options.find(o => o.id === optionId);
+    if (!optionData) return;
+    let recreatedId: string | null = null;
+    const cmd: Command = {
+      description: "Delete option",
+      execute: async () => {
+        const toDelete = recreatedId || optionId;
+        await api.options.delete(toDelete);
+        recreatedId = null;
+        await load();
+      },
+      unexecute: async () => {
+        const created = await api.options.create(id!, { title: optionData.title, sortOrder: optionData.sortOrder } as any);
+        recreatedId = created.id;
+        for (const oc of optionData.outcomes) {
+          await api.outcomes.create(created.id, { description: oc.description, probability: oc.probability, impact: oc.impact, sortOrder: oc.sortOrder } as any);
+        }
+        await load();
+      },
+    };
+    await executeCommand(cmd);
   };
 
   const updateOption = async (optionId: string, updates: Partial<Option>) => {
@@ -107,11 +182,20 @@ export default function DecisionWorkspace() {
 
   const addOutcome = async (optionId: string) => {
     const opt = options.find(o => o.id === optionId);
-    await api.outcomes.create(optionId, {
-      description: "New outcome",
-      sortOrder: opt ? opt.outcomes.length : 0,
-    } as any);
-    load();
+    const sortOrder = opt ? opt.outcomes.length : 0;
+    let createdId: string | null = null;
+    const cmd: Command = {
+      description: "Add outcome",
+      execute: async () => {
+        const created = await api.outcomes.create(optionId, { description: "New outcome", probability: 50, impact: 0, sortOrder } as any);
+        createdId = created.id;
+        await load();
+      },
+      unexecute: async () => {
+        if (createdId) { await api.outcomes.delete(createdId); createdId = null; await load(); }
+      },
+    };
+    await executeCommand(cmd);
   };
 
   const updateOutcome = async (outcomeId: string, updates: Partial<Outcome>) => {
@@ -119,17 +203,34 @@ export default function DecisionWorkspace() {
   };
 
   const deleteOutcome = async (outcomeId: string) => {
-    await api.outcomes.delete(outcomeId);
-    load();
+    let outcomeData: Outcome | undefined;
+    let parentOptionId: string | undefined;
+    for (const opt of options) {
+      const oc = opt.outcomes.find(o => o.id === outcomeId);
+      if (oc) { outcomeData = oc; parentOptionId = opt.id; break; }
+    }
+    if (!outcomeData || !parentOptionId) return;
+    let recreatedId: string | null = null;
+    const cmd: Command = {
+      description: "Delete outcome",
+      execute: async () => {
+        const toDelete = recreatedId || outcomeId;
+        await api.outcomes.delete(toDelete);
+        recreatedId = null;
+        await load();
+      },
+      unexecute: async () => {
+        const created = await api.outcomes.create(parentOptionId!, { description: outcomeData!.description, probability: outcomeData!.probability, impact: outcomeData!.impact, sortOrder: outcomeData!.sortOrder } as any);
+        recreatedId = created.id;
+        await load();
+      },
+    };
+    await executeCommand(cmd);
   };
 
   const reorderOutcomes = async (optionId: string, reordered: Outcome[]) => {
-    setOptions(prev => prev.map(o =>
-      o.id === optionId ? { ...o, outcomes: reordered } : o
-    ));
-    await Promise.all(
-      reordered.map((oc, idx) => api.outcomes.update(oc.id, { sortOrder: idx } as any))
-    );
+    setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: reordered } : o));
+    await Promise.all(reordered.map((oc, idx) => api.outcomes.update(oc.id, { sortOrder: idx } as any)));
   };
 
   const handleOptionDragEnd = (event: DragEndEvent) => {
@@ -140,25 +241,30 @@ export default function DecisionWorkspace() {
     if (oldIndex === -1 || newIndex === -1) return;
     const reordered = arrayMove(options, oldIndex, newIndex);
     setOptions(reordered);
-    Promise.all(
-      reordered.map((opt, idx) => api.options.update(opt.id, { sortOrder: idx } as any))
-    );
+    Promise.all(reordered.map((opt, idx) => api.options.update(opt.id, { sortOrder: idx } as any)));
   };
 
   const reorderPremortems = async (reordered: Premortem[]) => {
     setPremortems(reordered);
-    await Promise.all(
-      reordered.map((pm, idx) => api.premortems.update(pm.id, { sortOrder: idx } as any))
-    );
+    await Promise.all(reordered.map((pm, idx) => api.premortems.update(pm.id, { sortOrder: idx } as any)));
   };
 
-  const addPremortem = async (optionId?: string) => {
+  const addPremortem = async () => {
     if (!id) return;
-    await api.premortems.create(id, {
-      option_id: optionId || null,
-      sortOrder: premortems.length,
-    } as any);
-    load();
+    const sortOrder = premortems.length;
+    let createdId: string | null = null;
+    const cmd: Command = {
+      description: "Add risk",
+      execute: async () => {
+        const created = await api.premortems.create(id, { reason: "New risk", severity: "moderate", frequency: "possible", sortOrder } as any);
+        createdId = created.id;
+        await load();
+      },
+      unexecute: async () => {
+        if (createdId) { await api.premortems.delete(createdId); createdId = null; await load(); }
+      },
+    };
+    await executeCommand(cmd);
   };
 
   const updatePremortem = async (pmId: string, updates: Partial<Premortem>) => {
@@ -167,68 +273,63 @@ export default function DecisionWorkspace() {
   };
 
   const deletePremortem = async (pmId: string) => {
-    await api.premortems.delete(pmId);
-    load();
+    const pmData = premortems.find(p => p.id === pmId);
+    if (!pmData) return;
+    let recreatedId: string | null = null;
+    const cmd: Command = {
+      description: "Delete risk",
+      execute: async () => {
+        const toDelete = recreatedId || pmId;
+        await api.premortems.delete(toDelete);
+        recreatedId = null;
+        await load();
+      },
+      unexecute: async () => {
+        const created = await api.premortems.create(id!, { reason: pmData.reason, severity: pmData.severity, frequency: pmData.frequency, sortOrder: pmData.sortOrder } as any);
+        recreatedId = created.id;
+        await load();
+      },
+    };
+    await executeCommand(cmd);
   };
 
-  const calcEV = (ocs: Outcome[]) => {
-    if (ocs.length === 0) return 0;
-    return ocs.reduce((sum, o) => sum + (Number(o.probability) / 100) * Number(o.impact), 0);
-  };
+  const calcEV = (ocs: Outcome[]) =>
+    ocs.reduce((sum, o) => sum + (Number(o.probability) / 100) * Number(o.impact), 0);
 
   const buildContext = () => ({
-    title,
-    context,
+    title, context,
     options: options.map(o => ({
       title: o.title,
-      outcomes: o.outcomes.map(oc => ({
-        description: oc.description,
-        probability: oc.probability,
-        impact: oc.impact,
-      })),
+      outcomes: o.outcomes.map(oc => ({ description: oc.description, probability: oc.probability, impact: oc.impact })),
     })),
     premortems: premortems.map(p => ({ reason: p.reason, severity: p.severity })),
   });
 
   const autoGenerate = async () => {
-    if (!id || !title.trim()) {
-      toast({ title: "Enter a decision title first", variant: "destructive" });
-      return;
-    }
+    if (!id || !title.trim()) { toast({ title: "Enter a decision title first", variant: "destructive" }); return; }
     setGenerating(true);
     try {
       const { generated: gen } = await api.ai.assist("auto_generate", { title, context });
       if (!gen?.options) throw new Error("No data generated");
-
       for (let i = 0; i < gen.options.length; i++) {
         const opt = gen.options[i];
-        const inserted = await api.options.create(id, {
-          title: opt.title,
-          description: opt.description || null,
-          sort_order: options.length + i,
-        } as any);
+        const inserted = await api.options.create(id, { title: opt.title, description: opt.description || null, sort_order: options.length + i } as any);
         if (inserted && opt.outcomes) {
           for (const oc of opt.outcomes) {
-            await api.outcomes.create(inserted.id, {
-              description: oc.description,
-              probability: Math.max(0, Math.min(100, oc.probability)),
-              impact: Math.max(-10, Math.min(10, oc.impact)),
-            } as any);
+            await api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any);
           }
         }
       }
       if (gen.premortems) {
         for (const pm of gen.premortems) {
-          await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "medium" } as any);
+          await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any);
         }
       }
       await load();
       toast({ title: "AI generated options, outcomes & risks!" });
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
-    } finally {
-      setGenerating(false);
-    }
+    } finally { setGenerating(false); }
   };
 
   const suggestOption = async () => {
@@ -237,28 +338,17 @@ export default function DecisionWorkspace() {
     try {
       const { generated: gen } = await api.ai.assist("suggest_options", buildContext());
       if (!gen?.title) throw new Error("No option generated");
-
-      const inserted = await api.options.create(id, {
-        title: gen.title,
-        description: gen.description || null,
-        sort_order: options.length,
-      } as any);
+      const inserted = await api.options.create(id, { title: gen.title, description: gen.description || null, sort_order: options.length } as any);
       if (inserted && gen.outcomes) {
         for (const oc of gen.outcomes) {
-          await api.outcomes.create(inserted.id, {
-            description: oc.description,
-            probability: Math.max(0, Math.min(100, oc.probability)),
-            impact: Math.max(-10, Math.min(10, oc.impact)),
-          } as any);
+          await api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any);
         }
       }
       await load();
       toast({ title: `AI suggested: "${gen.title}"` });
     } catch (err: any) {
       toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });
-    } finally {
-      setSuggestingOption(false);
-    }
+    } finally { setSuggestingOption(false); }
   };
 
   const suggestOutcomes = async (optionId: string) => {
@@ -266,27 +356,16 @@ export default function DecisionWorkspace() {
     const opt = options.find(o => o.id === optionId);
     if (!opt) return;
     try {
-      const { generated: gen } = await api.ai.assist("suggest_outcomes", {
-        ...buildContext(),
-        target_option_title: opt.title,
-        target_option_outcomes: opt.outcomes.map(oc => ({ description: oc.description })),
-      });
+      const { generated: gen } = await api.ai.assist("suggest_outcomes", { ...buildContext(), target_option_title: opt.title, target_option_outcomes: opt.outcomes.map(oc => ({ description: oc.description })) });
       if (!gen?.outcomes) throw new Error("No outcomes generated");
-
       for (const oc of gen.outcomes) {
-        await api.outcomes.create(optionId, {
-          description: oc.description,
-          probability: Math.max(0, Math.min(100, oc.probability)),
-          impact: Math.max(-10, Math.min(10, oc.impact)),
-        } as any);
+        await api.outcomes.create(optionId, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any);
       }
       await load();
       toast({ title: `Added ${gen.outcomes.length} suggested outcomes` });
     } catch (err: any) {
       toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });
-    } finally {
-      setSuggestingOutcomesFor(null);
-    }
+    } finally { setSuggestingOutcomesFor(null); }
   };
 
   const checkBiases = async () => {
@@ -298,9 +377,7 @@ export default function DecisionWorkspace() {
       toast({ title: `Found ${gen.biases.length} potential biases` });
     } catch (err: any) {
       toast({ title: "Bias check failed", description: err.message, variant: "destructive" });
-    } finally {
-      setCheckingBiases(false);
-    }
+    } finally { setCheckingBiases(false); }
   };
 
   const suggestPremortems = async () => {
@@ -309,17 +386,14 @@ export default function DecisionWorkspace() {
     try {
       const { generated: gen } = await api.ai.assist("suggest_premortems", buildContext());
       if (!gen?.premortems) throw new Error("No premortems generated");
-
       for (const pm of gen.premortems) {
-        await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "medium" } as any);
+        await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any);
       }
       await load();
       toast({ title: `Added ${gen.premortems.length} potential risks` });
     } catch (err: any) {
       toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });
-    } finally {
-      setSuggestingPremortems(false);
-    }
+    } finally { setSuggestingPremortems(false); }
   };
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
@@ -332,8 +406,18 @@ export default function DecisionWorkspace() {
   if (!decision) return null;
 
   const sortedByEV = [...options].sort((a, b) => calcEV(b.outcomes) - calcEV(a.outcomes));
-  const highRisks = premortems.filter(p => p.severity === "high" || p.severity === "critical");
-  const frequentRisks = premortems.filter(p => p.frequency === "likely" || p.frequency === "almost certain");
+
+  const sortedPremortems = [...premortems].sort((a, b) =>
+    getRiskScore(b.frequency || "possible", b.severity || "moderate") -
+    getRiskScore(a.frequency || "possible", a.severity || "moderate")
+  );
+
+  const riskCountByImpact = ["severe", "significant", "moderate", "minor", "negligible"].map(imp => ({
+    impact: imp,
+    count: premortems.filter(p => (p.severity || "moderate") === imp).length,
+  }));
+
+  const topRisks = sortedPremortems.slice(0, 5);
 
   return (
     <TooltipProvider>
@@ -341,8 +425,29 @@ export default function DecisionWorkspace() {
         <div className={`flex-1 transition-all flex flex-col ${showAi ? "mr-80 lg:mr-96" : ""}`}>
           <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-medium text-muted-foreground truncate max-w-[200px]">{title || "Untitled"}</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={!canUndo}
+                  onClick={handleUndo}
+                  title="Undo (Ctrl+Z)"
+                  data-testid="button-undo"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  disabled={!canRedo}
+                  onClick={handleRedo}
+                  title="Redo (Ctrl+Shift+Z)"
+                  data-testid="button-redo"
+                >
+                  <Redo2 className="w-4 h-4" />
+                </Button>
               </div>
               <div className="flex items-center gap-1">
                 <AlertDialog>
@@ -375,7 +480,7 @@ export default function DecisionWorkspace() {
             </div>
           </header>
 
-          <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
               <Input
                 value={title}
@@ -484,7 +589,6 @@ export default function DecisionWorkspace() {
 
               {tab === "review" && (
                 <motion.div key="review" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-                  {/* Expected Value Summary */}
                   <div className="glass-panel p-6 space-y-4">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
                       <TrendingUp className="w-5 h-5 text-primary" />
@@ -496,8 +600,8 @@ export default function DecisionWorkspace() {
                       <div className="space-y-3">
                         {sortedByEV.map((opt, i) => {
                           const ev = calcEV(opt.outcomes);
-                          const maxEV = calcEV(sortedByEV[0].outcomes);
-                          const barWidth = maxEV !== 0 ? Math.abs(ev / maxEV) * 100 : 0;
+                          const maxAbsEV = Math.max(...sortedByEV.map(o => Math.abs(calcEV(o.outcomes))), 0.01);
+                          const barWidth = (Math.abs(ev) / maxAbsEV) * 100;
                           return (
                             <div key={opt.id} className={`p-3 rounded-lg border space-y-2 ${i === 0 ? "border-primary/50 bg-primary/5" : "border-border"}`}>
                               <div className="flex items-center justify-between">
@@ -510,10 +614,7 @@ export default function DecisionWorkspace() {
                                 </span>
                               </div>
                               <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all ${ev >= 0 ? "bg-green-500" : "bg-destructive"}`}
-                                  style={{ width: `${barWidth}%` }}
-                                />
+                                <div className={`h-full rounded-full transition-all ${ev >= 0 ? "bg-green-500" : "bg-destructive"}`} style={{ width: `${barWidth}%` }} />
                               </div>
                               {opt.outcomes.length > 0 && (
                                 <div className="text-xs text-muted-foreground space-y-0.5">
@@ -532,7 +633,6 @@ export default function DecisionWorkspace() {
                     )}
                   </div>
 
-                  {/* Risk Summary */}
                   <div className="glass-panel p-6 space-y-4">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
                       <AlertTriangle className="w-5 h-5 text-warning" />
@@ -542,54 +642,46 @@ export default function DecisionWorkspace() {
                       <p className="text-muted-foreground text-sm">Add premortem risks in the Premortem tab to see them summarized here.</p>
                     ) : (
                       <div className="space-y-3">
-                        {(highRisks.length > 0 || frequentRisks.length > 0) && (
+                        {topRisks.length > 0 && (
                           <div className="p-3 rounded-lg border border-destructive/30 bg-destructive/5 space-y-2">
-                            <p className="text-xs font-semibold text-destructive uppercase tracking-wide">Top Concerns</p>
-                            {[...new Set([...highRisks, ...frequentRisks])].slice(0, 4).map(pm => (
-                              <div key={pm.id} className="flex items-start gap-2 text-sm">
-                                <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium mt-0.5 ${
-                                  pm.severity === "critical" ? "bg-destructive/20 text-destructive" :
-                                  pm.severity === "high" ? "bg-destructive/10 text-destructive" :
-                                  "bg-warning/10 text-warning"
-                                }`}>{pm.severity}</span>
-                                <span className="text-muted-foreground leading-snug">{pm.reason}</span>
-                              </div>
-                            ))}
+                            <p className="text-xs font-semibold text-destructive uppercase tracking-wide">Highest Risk Items</p>
+                            {topRisks.map(pm => {
+                              const rs = getRiskScore(pm.frequency || "possible", pm.severity || "moderate");
+                              return (
+                                <div key={pm.id} className="flex items-start gap-2 text-sm">
+                                  <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-bold mt-0.5 ${rs >= 20 ? "bg-destructive/20 text-destructive" : rs >= 12 ? "bg-destructive/10 text-destructive" : rs >= 6 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>
+                                    {rs}
+                                  </span>
+                                  <span className="text-muted-foreground leading-snug text-xs">{pm.reason}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                          {["low", "medium", "high"].map(sev => {
-                            const count = premortems.filter(p => p.severity === sev).length;
+                        <div className="grid grid-cols-5 gap-2 text-center">
+                          {riskCountByImpact.map(({ impact, count }) => (
+                            <div key={impact} className={`p-2 rounded-lg border ${
+                              impact === "severe" ? "border-destructive/40 bg-destructive/10" :
+                              impact === "significant" ? "border-destructive/20 bg-destructive/5" :
+                              impact === "moderate" ? "border-warning/30 bg-warning/5" :
+                              "border-border bg-muted/30"
+                            }`}>
+                              <p className="text-lg font-bold">{count}</p>
+                              <p className="text-xs text-muted-foreground capitalize leading-tight">{impact}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="space-y-1">
+                          {sortedPremortems.map(pm => {
+                            const rs = getRiskScore(pm.frequency || "possible", pm.severity || "moderate");
                             return (
-                              <div key={sev} className={`p-3 rounded-lg border ${
-                                sev === "high" ? "border-destructive/30 bg-destructive/5" :
-                                sev === "medium" ? "border-warning/30 bg-warning/5" :
-                                "border-border bg-muted/30"
-                              }`}>
-                                <p className="text-2xl font-bold">{count}</p>
-                                <p className="text-xs text-muted-foreground capitalize">{sev} severity</p>
+                              <div key={pm.id} className="flex items-center gap-2 text-sm py-1 border-b border-border/50 last:border-0">
+                                <span className={`shrink-0 w-8 text-center text-xs px-1 py-0.5 rounded font-bold ${rs >= 20 ? "bg-destructive/20 text-destructive" : rs >= 12 ? "bg-destructive/10 text-destructive" : rs >= 6 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>{rs}</span>
+                                <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${getImpactColorClass(pm.severity || "moderate")}`}>{pm.severity}</span>
+                                <span className="text-muted-foreground text-xs leading-snug truncate">{pm.reason}</span>
                               </div>
                             );
                           })}
-                        </div>
-                        <div className="space-y-1">
-                          {premortems.map(pm => (
-                            <div key={pm.id} className="flex items-center gap-2 text-sm py-1 border-b border-border/50 last:border-0">
-                              <span className={`shrink-0 w-16 text-center text-xs px-1.5 py-0.5 rounded font-medium ${
-                                pm.severity === "critical" ? "bg-destructive/20 text-destructive" :
-                                pm.severity === "high" ? "bg-destructive/10 text-destructive" :
-                                pm.severity === "medium" ? "bg-warning/10 text-warning" :
-                                "bg-muted text-muted-foreground"
-                              }`}>{pm.severity}</span>
-                              <span className={`shrink-0 w-24 text-center text-xs px-1.5 py-0.5 rounded font-medium ${
-                                pm.frequency === "almost certain" ? "bg-destructive/10 text-destructive" :
-                                pm.frequency === "likely" ? "bg-warning/10 text-warning" :
-                                pm.frequency === "occasional" ? "bg-blue-500/10 text-blue-600 dark:text-blue-400" :
-                                "bg-muted text-muted-foreground"
-                              }`}>{pm.frequency}</span>
-                              <span className="text-muted-foreground text-xs leading-snug truncate">{pm.reason}</span>
-                            </div>
-                          ))}
                         </div>
                       </div>
                     )}
@@ -599,28 +691,67 @@ export default function DecisionWorkspace() {
 
               {tab === "actual" && (
                 <motion.div key="actual" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
-                  <div className="glass-panel p-6 space-y-4">
+                  <div className="glass-panel p-6 space-y-5">
                     <h3 className="font-semibold text-lg flex items-center gap-2">
                       <ClipboardCheck className="w-5 h-5 text-primary" />
                       Actual Outcome
                     </h3>
-                    <p className="text-sm text-muted-foreground">Record what actually happened after making this decision.</p>
-                    <Textarea
-                      value={decision.actualOutcome || ""}
-                      onChange={(e) => setDecision({ ...decision, actualOutcome: e.target.value })}
-                      onBlur={() => id && api.decisions.update(id, { actualOutcome: decision.actualOutcome })}
-                      placeholder="What actually happened? How did it turn out?"
-                      rows={4}
-                      data-testid="input-actual-outcome"
-                    />
-                    <Textarea
-                      value={decision.reflection || ""}
-                      onChange={(e) => setDecision({ ...decision, reflection: e.target.value })}
-                      onBlur={() => id && api.decisions.update(id, { reflection: decision.reflection })}
-                      placeholder="Reflection: What did you learn? Would you make the same decision again?"
-                      rows={3}
-                      data-testid="input-reflection"
-                    />
+                    <p className="text-sm text-muted-foreground">Record what actually happened after making this decision to close the feedback loop.</p>
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">When did you make the decision?</label>
+                      <Input
+                        type="date"
+                        value={decision.outcomeDate ? decision.outcomeDate.split("T")[0] : ""}
+                        onChange={(e) => setDecision({ ...decision, outcomeDate: e.target.value || null })}
+                        onBlur={() => id && api.decisions.update(id, { outcomeDate: decision.outcomeDate || null } as any)}
+                        className="max-w-xs"
+                        data-testid="input-outcome-date"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Which option did you choose?</label>
+                      <select
+                        value={decision.chosenOptionId || ""}
+                        onChange={(e) => {
+                          const val = e.target.value || null;
+                          setDecision({ ...decision, chosenOptionId: val });
+                          if (id) api.decisions.update(id, { chosenOptionId: val } as any);
+                        }}
+                        className="h-9 px-3 rounded-md border border-input bg-background text-sm w-full max-w-xs"
+                        data-testid="select-chosen-option"
+                      >
+                        <option value="">— Select an option —</option>
+                        {options.map(opt => (
+                          <option key={opt.id} value={opt.id}>{opt.title}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">What actually happened?</label>
+                      <Textarea
+                        value={decision.actualOutcome || ""}
+                        onChange={(e) => setDecision({ ...decision, actualOutcome: e.target.value })}
+                        onBlur={() => id && api.decisions.update(id, { actualOutcome: decision.actualOutcome })}
+                        placeholder="Describe what actually happened after you made the decision..."
+                        rows={4}
+                        data-testid="input-actual-outcome"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-sm font-medium">Reflection</label>
+                      <Textarea
+                        value={decision.reflection || ""}
+                        onChange={(e) => setDecision({ ...decision, reflection: e.target.value })}
+                        onBlur={() => id && api.decisions.update(id, { reflection: decision.reflection })}
+                        placeholder="What did you learn? Was the process useful? Would you make the same decision again?"
+                        rows={3}
+                        data-testid="input-reflection"
+                      />
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -641,4 +772,11 @@ export default function DecisionWorkspace() {
       </div>
     </TooltipProvider>
   );
+}
+
+function getImpactColorClass(severity: string) {
+  if (severity === "severe") return "bg-destructive/20 text-destructive";
+  if (severity === "significant") return "bg-destructive/10 text-destructive";
+  if (severity === "moderate") return "bg-warning/10 text-warning";
+  return "bg-muted text-muted-foreground";
 }

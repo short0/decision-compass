@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useLayoutEffect, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, AlertTriangle, Sparkles, Loader2, GripVertical } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -20,6 +20,69 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Option, Premortem } from "@/lib/api";
 import type { BiasAnnotation } from "@/components/OptionCard";
 
+// Likelihood: stored in the `frequency` column
+// Impact: stored in the `severity` column
+
+export const LIKELIHOOD_OPTIONS = [
+  { value: "very unlikely", label: "Very Unlikely", score: 1 },
+  { value: "unlikely", label: "Unlikely", score: 2 },
+  { value: "possible", label: "Possible", score: 3 },
+  { value: "likely", label: "Likely", score: 4 },
+  { value: "very likely", label: "Very Likely", score: 5 },
+];
+
+export const IMPACT_OPTIONS = [
+  { value: "negligible", label: "Negligible", score: 1 },
+  { value: "minor", label: "Minor", score: 2 },
+  { value: "moderate", label: "Moderate", score: 3 },
+  { value: "significant", label: "Significant", score: 4 },
+  { value: "severe", label: "Severe", score: 5 },
+];
+
+export function getLikelihoodScore(value: string) {
+  return LIKELIHOOD_OPTIONS.find(o => o.value === value)?.score ?? 3;
+}
+
+export function getImpactScore(value: string) {
+  return IMPACT_OPTIONS.find(o => o.value === value)?.score ?? 3;
+}
+
+export function getRiskScore(likelihood: string, impact: string) {
+  return getLikelihoodScore(likelihood) * getImpactScore(impact);
+}
+
+function riskColor(score: number) {
+  if (score >= 20) return "bg-destructive/20 text-destructive border-destructive/40";
+  if (score >= 12) return "bg-destructive/10 text-destructive border-destructive/20";
+  if (score >= 6) return "bg-warning/10 text-warning border-warning/20";
+  return "bg-muted text-muted-foreground border-border";
+}
+
+function likelihoodColor(value: string) {
+  const score = getLikelihoodScore(value);
+  if (score >= 4) return "bg-destructive/10 text-destructive border-destructive/20";
+  if (score === 3) return "bg-warning/10 text-warning border-warning/20";
+  return "bg-muted text-muted-foreground border-border";
+}
+
+function impactColor(value: string) {
+  const score = getImpactScore(value);
+  if (score >= 4) return "bg-destructive/10 text-destructive border-destructive/20";
+  if (score === 3) return "bg-warning/10 text-warning border-warning/20";
+  return "bg-muted text-muted-foreground border-border";
+}
+
+function useAutoResize(value: string) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "0px";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return ref;
+}
+
 interface Props {
   premortems: Premortem[];
   options: Option[];
@@ -31,31 +94,6 @@ interface Props {
   onSuggestPremortems: () => void;
   suggestingPremortems: boolean;
 }
-
-function useAutoResize(value: string) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = el.scrollHeight + "px";
-  }, [value]);
-  return ref;
-}
-
-const severityColors: Record<string, string> = {
-  low: "bg-muted text-muted-foreground border-border",
-  medium: "bg-warning/10 text-warning border-warning/30",
-  high: "bg-destructive/10 text-destructive border-destructive/30",
-  critical: "bg-destructive/20 text-destructive border-destructive/50",
-};
-
-const frequencyColors: Record<string, string> = {
-  rare: "bg-muted text-muted-foreground border-border",
-  occasional: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30",
-  likely: "bg-warning/10 text-warning border-warning/30",
-  "almost certain": "bg-destructive/10 text-destructive border-destructive/30",
-};
 
 export default function PremortermPanel({ premortems, options, biases, onAdd, onUpdate, onDelete, onReorder, onSuggestPremortems, suggestingPremortems }: Props) {
   const [localPremortems, setLocalPremortems] = useState(premortems);
@@ -87,15 +125,40 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
           <h3 className="font-semibold text-lg">Premortem Analysis</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Imagine this decision has already failed. What went wrong? List every reason you can think of.
+          Imagine this decision has already failed. What went wrong? For each risk, rate Likelihood (1–5) × Impact (1–5) to get a Risk Score.
         </p>
 
         {localPremortems.length > 0 && (
-          <div className="hidden sm:grid grid-cols-[24px_1fr_120px_100px_36px] gap-2 text-xs text-muted-foreground font-mono px-1">
+          <div className="hidden sm:grid grid-cols-[24px_1fr_130px_130px_56px_36px] gap-2 text-xs text-muted-foreground font-mono px-1">
             <span />
             <span>Risk / Failure Reason</span>
-            <span className="text-center">Frequency</span>
-            <span className="text-center">Severity</span>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <span className="text-center cursor-help underline decoration-dotted">Likelihood</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px] z-[100]">
+                <p className="text-sm font-semibold mb-1">Likelihood (1–5)</p>
+                <p className="text-xs text-muted-foreground">How probable is this failure mode?</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <span className="text-center cursor-help underline decoration-dotted">Impact</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px] z-[100]">
+                <p className="text-sm font-semibold mb-1">Impact (1–5)</p>
+                <p className="text-xs text-muted-foreground">How severe would the damage be?</p>
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <span className="text-center cursor-help underline decoration-dotted">Risk</span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px] z-[100]">
+                <p className="text-sm font-semibold mb-1">Risk Score (1–25)</p>
+                <p className="text-xs text-muted-foreground">Likelihood × Impact. ≥20 = critical, ≥12 = high, ≥6 = medium.</p>
+              </TooltipContent>
+            </Tooltip>
             <span />
           </div>
         )}
@@ -179,10 +242,14 @@ function SortablePremortermRow({
     opacity: isDragging ? 0.4 : 1,
   };
 
+  const likelihood = premortem.frequency || "possible";
+  const impact = premortem.severity || "moderate";
+  const riskScore = getRiskScore(likelihood, impact);
+
   return (
     <div ref={setNodeRef} style={style} className="space-y-1">
       {/* Desktop layout */}
-      <div className="hidden sm:grid grid-cols-[24px_1fr_120px_100px_36px] gap-2 items-start">
+      <div className="hidden sm:grid grid-cols-[24px_1fr_130px_130px_56px_36px] gap-2 items-start">
         <button
           {...attributes}
           {...listeners}
@@ -195,30 +262,30 @@ function SortablePremortermRow({
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           onBlur={() => onUpdate(premortem.id, { reason })}
-          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 overflow-hidden resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
-          rows={1}
-          style={{ minHeight: "36px" }}
+          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
+          style={{ overflowY: "hidden", minHeight: "36px" }}
         />
         <select
-          value={premortem.frequency}
+          value={likelihood}
           onChange={(e) => onUpdate(premortem.id, { frequency: e.target.value })}
-          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${frequencyColors[premortem.frequency] || frequencyColors.occasional}`}
+          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${likelihoodColor(likelihood)}`}
         >
-          <option value="rare">Rare</option>
-          <option value="occasional">Occasional</option>
-          <option value="likely">Likely</option>
-          <option value="almost certain">Almost Certain</option>
+          {LIKELIHOOD_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
+          ))}
         </select>
         <select
-          value={premortem.severity}
+          value={impact}
           onChange={(e) => onUpdate(premortem.id, { severity: e.target.value })}
-          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${severityColors[premortem.severity] || severityColors.medium}`}
+          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${impactColor(impact)}`}
         >
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
-          <option value="critical">Critical</option>
+          {IMPACT_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
+          ))}
         </select>
+        <div className={`h-9 flex items-center justify-center rounded-md border text-xs font-bold ${riskColor(riskScore)}`}>
+          {riskScore}
+        </div>
         <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => onDelete(premortem.id)}>
           <Trash2 className="w-3 h-3 text-muted-foreground" />
         </Button>
@@ -234,44 +301,45 @@ function SortablePremortermRow({
           >
             <GripVertical className="w-4 h-4" />
           </button>
-          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(premortem.id)}>
-            <Trash2 className="w-3 h-3 text-muted-foreground" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-0.5 rounded text-xs font-bold border ${riskColor(riskScore)}`}>
+              Risk: {riskScore}
+            </span>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(premortem.id)}>
+              <Trash2 className="w-3 h-3 text-muted-foreground" />
+            </Button>
+          </div>
         </div>
         <textarea
-          ref={reasonRef}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           onBlur={() => onUpdate(premortem.id, { reason })}
-          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 overflow-hidden resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
-          rows={2}
-          style={{ minHeight: "54px" }}
+          className={`w-full text-sm rounded-md border border-input bg-background px-3 py-2 resize-none focus:outline-none focus:ring-1 focus:ring-ring leading-snug ${bias ? "border-warning/50" : ""}`}
+          style={{ overflowY: "hidden", minHeight: "54px" }}
         />
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Frequency</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Likelihood</label>
             <select
-              value={premortem.frequency}
+              value={likelihood}
               onChange={(e) => onUpdate(premortem.id, { frequency: e.target.value })}
-              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${frequencyColors[premortem.frequency] || frequencyColors.occasional}`}
+              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${likelihoodColor(likelihood)}`}
             >
-              <option value="rare">Rare</option>
-              <option value="occasional">Occasional</option>
-              <option value="likely">Likely</option>
-              <option value="almost certain">Almost Certain</option>
+              {LIKELIHOOD_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
+              ))}
             </select>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Severity</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Impact</label>
             <select
-              value={premortem.severity}
+              value={impact}
               onChange={(e) => onUpdate(premortem.id, { severity: e.target.value })}
-              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${severityColors[premortem.severity] || severityColors.medium}`}
+              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${impactColor(impact)}`}
             >
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
+              {IMPACT_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
+              ))}
             </select>
           </div>
         </div>
@@ -284,9 +352,9 @@ function SortablePremortermRow({
               ⚠ {bias.bias_name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-sm z-50" sideOffset={4}>
+          <TooltipContent side="top" className="max-w-[300px] z-[100]" sideOffset={4}>
             <p className="text-sm font-semibold mb-1">{bias.bias_name}</p>
-            <p className="text-xs leading-relaxed">{bias.explanation}</p>
+            <p className="text-xs leading-relaxed break-words">{bias.explanation}</p>
           </TooltipContent>
         </Tooltip>
       )}
