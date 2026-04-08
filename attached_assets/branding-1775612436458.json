@@ -1,0 +1,129 @@
+{
+  "colorScheme": "light",
+  "fonts": [
+    {
+      "family": "Inter",
+      "role": "body"
+    }
+  ],
+  "colors": {
+    "primary": "#676F7E",
+    "secondary": "#9CA3AF",
+    "accent": "#F5930A",
+    "background": "#F6F7F9",
+    "textPrimary": "#131720",
+    "link": "#F5930A"
+  },
+  "typography": {
+    "fontFamilies": {
+      "primary": "Inter",
+      "heading": "Inter"
+    },
+    "fontStacks": {
+      "heading": [
+        "Inter",
+        "sans-serif"
+      ],
+      "body": [
+        "Inter",
+        "sans-serif"
+      ],
+      "paragraph": [
+        "Inter",
+        "sans-serif"
+      ]
+    },
+    "fontSizes": {
+      "h1": "24px",
+      "h2": "24px",
+      "body": "14px"
+    }
+  },
+  "spacing": {
+    "baseUnit": 4,
+    "borderRadius": "4px"
+  },
+  "components": {
+    "input": {
+      "background": "transparent",
+      "textColor": "#131720",
+      "borderColor": null,
+      "borderRadius": "0px",
+      "borderRadiusCorners": {
+        "topLeft": "0px",
+        "topRight": "0px",
+        "bottomRight": "0px",
+        "bottomLeft": "0px"
+      },
+      "shadow": "none"
+    },
+    "buttonPrimary": {
+      "background": "#F5930A",
+      "textColor": "#FFFFFF",
+      "borderRadius": "8px",
+      "borderRadiusCorners": {
+        "topLeft": "8px",
+        "topRight": "8px",
+        "bottomRight": "8px",
+        "bottomLeft": "8px"
+      },
+      "shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.05) 0px 1px 2px 0px"
+    },
+    "buttonSecondary": {
+      "background": "#FFFFFF",
+      "textColor": "#131720",
+      "borderColor": "#DCDFE4",
+      "borderRadius": "10px",
+      "borderRadiusCorners": {
+        "topLeft": "10px",
+        "topRight": "10px",
+        "bottomRight": "10px",
+        "bottomLeft": "10px"
+      },
+      "shadow": "none"
+    }
+  },
+  "images": {
+    "logo": null,
+    "favicon": null,
+    "ogImage": "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/5b938f2c-db82-4852-a67f-8e6d046e34e5?Expires=1772157684&GoogleAccessId=go-api-on-aws%40gpt-engineer-390607.iam.gserviceaccount.com&Signature=POTr7JaKFIp9xIVM41MtGluhM4OKg%2F11KkkGUuNUltariUOxrkqxJkkgetlS34lhDlJIlaOaKwg6dkhmh4yB%2BIz2lvzL2bV%2Btb8NwRtJbjB%2FOaAVap3yqgRDR4S2z%2FllaMLq1lHzbZGfABzoMaAmXKv1ZK7cW7D61LjHMcmTty1XpHEOaUCkCtIbfUmL%2BcngMJsHfBppM%2F7zJUv22zdwRYXPO18%2FkZfBR6HSV2f%2FyR%2BnRNPGN6xL7IW%2FWZxcOpllLnV0RX8piAxAS2aoVpFiotJtqXczilmNhfN7n3fVTij1XoF4cgVf7jPa3jGvF0xUJk4aPTFFTMUXi1%2FKwnHNsQ%3D%3D"
+  },
+  "__llm_button_reasoning": {
+    "primary": {
+      "index": 0,
+      "text": "Start Analysis",
+      "reasoning": "Button #0 has a vibrant orange background (#F5930A) and action-oriented text 'Start Analysis', making it the primary CTA."
+    },
+    "secondary": {
+      "index": 1,
+      "text": "🏠Buy vs. Rent2 options · 5 risksShould I buy a house or continue renting?",
+      "reasoning": "Button #1 has a different background color (#FFFFFF) and serves as a secondary option with informative text, making it suitable as a secondary button."
+    },
+    "confidence": 0.95
+  },
+  "personality": {
+    "tone": "modern",
+    "energy": "medium",
+    "targetAudience": "professionals and decision-makers"
+  },
+  "designSystem": {
+    "framework": "tailwind",
+    "componentLibrary": ""
+  },
+  "confidence": {
+    "buttons": 0.95,
+    "colors": 0.9,
+    "overall": 0.925
+  },
+  "__llm_metadata": {
+    "logoSelection": {
+      "llmCalled": false,
+      "llmSucceeded": false,
+      "finalSource": "none"
+    },
+    "buttonClassification": {
+      "llmCalled": true,
+      "llmSucceeded": true
+    }
+  }
+}
