@@ -447,10 +447,10 @@ export default function DecisionWorkspace() {
   );
 
   const riskBands = [
-    { label: "Critical", min: 20, color: "border-destructive/50 bg-destructive/15", textColor: "text-destructive" },
-    { label: "High",     min: 12, color: "border-destructive/30 bg-destructive/8",  textColor: "text-destructive" },
-    { label: "Medium",   min: 6,  color: "border-warning/40 bg-warning/10",          textColor: "text-warning" },
-    { label: "Low",      min: 0,  color: "border-border bg-muted/30",                textColor: "text-muted-foreground" },
+    { label: "Critical", min: 20, color: "border-destructive/40 bg-destructive/20", textColor: "text-destructive" },
+    { label: "High",     min: 12, color: "border-destructive/20 bg-destructive/10", textColor: "text-destructive" },
+    { label: "Medium",   min: 6,  color: "border-warning/20 bg-warning/10",         textColor: "text-warning" },
+    { label: "Low",      min: 0,  color: "border-border bg-muted",                  textColor: "text-muted-foreground" },
   ];
   const riskCountByBand = riskBands.map(band => ({
     ...band,
