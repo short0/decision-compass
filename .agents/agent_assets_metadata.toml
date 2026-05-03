@@ -23,3 +23,9 @@ id = "GcwZINFQtroRysP8e3XRR"
 uri = "file://attached_assets/decy-wordmark.png"
 type = "image"
 title = "Decy — Wordmark"
+
+[[outputs]]
+id = "sugc-ZKU_SQ_W9pQRW63v"
+uri = "file://attached_assets/decy-wordmark.svg"
+type = "image"
+title = "Decy — Wordmark (with actual icon)"
