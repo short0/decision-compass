@@ -12,6 +12,12 @@ uri = "file://attached_assets/decy-wordmark.png"
 type = "image"
 title = "decy wordmark with compass icon"
 
+[[generated]]
+id = "xFzEL0sUkwd63v2NPLo02"
+uri = "file://attached_assets/project-image.png"
+type = "image"
+title = "decy project image"
+
 [[outputs]]
 id = "NHeb2Xfv1qsrRbcfBH9Fq"
 uri = "file://attached_assets/decy-icon.png"
@@ -29,3 +35,9 @@ id = "sugc-ZKU_SQ_W9pQRW63v"
 uri = "file://attached_assets/decy-wordmark.svg"
 type = "image"
 title = "Decy — Wordmark"
+
+[[outputs]]
+id = "j8SYwlPZSTRJ0yrsKRrLY"
+uri = "file://attached_assets/project-image.png"
+type = "image"
+title = "Decy — Project Image"
