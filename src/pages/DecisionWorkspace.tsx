@@ -294,9 +294,9 @@ export default function DecisionWorkspace() {
     await executeCommand(cmd);
   };
 
-  const updatePremortem = async (pmId: string, updates: Partial<Premortem>) => {
-    await api.premortems.update(pmId, updates);
+  const updatePremortem = (pmId: string, updates: Partial<Premortem>) => {
     setPremortems(prev => prev.map(p => p.id === pmId ? { ...p, ...updates } : p));
+    api.premortems.update(pmId, updates);
   };
 
   const deletePremortem = async (pmId: string) => {
