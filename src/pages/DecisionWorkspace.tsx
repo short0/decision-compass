@@ -513,7 +513,7 @@ export default function DecisionWorkspace() {
           <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
               <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What decision are you making?</p>
+                <p className="text-xs font-medium text-muted-foreground">What decision are you making?</p>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
@@ -524,7 +524,7 @@ export default function DecisionWorkspace() {
                 />
               </div>
               <div className="space-y-1">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Context &amp; constraints</p>
+                <p className="text-xs font-medium text-muted-foreground">Context &amp; constraints</p>
                 <Textarea
                   value={context}
                   onChange={(e) => setContext(e.target.value)}
