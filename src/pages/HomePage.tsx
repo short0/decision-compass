@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import decyIconUrl from "@assets/decy-icon.png";
 import { motion } from "framer-motion";
+import CompassSpinner from "@/components/CompassSpinner";
 
 type PresetOutcome = { description: string; probability: number; impact: number };
 type PresetOption = { title: string; outcomes: PresetOutcome[] };
@@ -303,7 +304,7 @@ export default function HomePage() {
               >
                 {loadingPreset === preset.label && (
                   <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/80">
-                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                    <CompassSpinner size={32} />
                   </div>
                 )}
                 <div className="flex items-center gap-1.5">
