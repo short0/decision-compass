@@ -487,7 +487,7 @@ export default function DecisionWorkspace() {
                       <span className="hidden sm:inline">Delete</span>
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); deleteCancelRef.current?.focus(); }}>
+                  <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); requestAnimationFrame(() => deleteCancelRef.current?.focus()); }}>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete this decision?</AlertDialogTitle>
                       <AlertDialogDescription>

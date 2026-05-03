@@ -169,7 +169,7 @@ export default function DecisionSidebar() {
       </div>
 
       <AlertDialog open={!!pendingDeleteId} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}>
-        <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); cancelRef.current?.focus(); }}>
+        <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); requestAnimationFrame(() => cancelRef.current?.focus()); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this decision?</AlertDialogTitle>
             <AlertDialogDescription>
