@@ -162,11 +162,11 @@ export default function DecisionWorkspace() {
       description: "Add option",
       execute: async () => {
         cancelled = false;
-        setOptions(prev => [...prev, { id: tempId, decisionId: id, title: `Option ${sortOrder + 1}`, description: null, sortOrder, createdAt: new Date().toISOString(), outcomes: [] } as any]);
+        setOptions(prev => [...prev, { id: tempId, _stableKey: tempId, decisionId: id, title: `Option ${sortOrder + 1}`, description: null, sortOrder, createdAt: new Date().toISOString(), outcomes: [] } as any]);
         const created = await api.options.create(id, { title: `Option ${sortOrder + 1}`, sortOrder } as any);
         if (cancelled) { api.options.delete(created.id); return; }
         createdId = created.id;
-        setOptions(prev => prev.map(o => o.id === tempId ? { ...created, outcomes: [] } : o));
+        setOptions(prev => prev.map(o => o.id === tempId ? { ...created, _stableKey: tempId, outcomes: [] } as any : o));
       },
       unexecute: async () => {
         cancelled = true;
@@ -197,7 +197,7 @@ export default function DecisionWorkspace() {
       },
       unexecute: async () => {
         const tempId = `temp-${Date.now()}`;
-        setOptions(prev => [...prev, { id: tempId, decisionId: id!, title: optionData.title, description: null, sortOrder: optionData.sortOrder, createdAt: new Date().toISOString(), outcomes: optionData.outcomes } as any].sort((a, b) => a.sortOrder - b.sortOrder));
+        setOptions(prev => [...prev, { id: tempId, _stableKey: tempId, decisionId: id!, title: optionData.title, description: null, sortOrder: optionData.sortOrder, createdAt: new Date().toISOString(), outcomes: optionData.outcomes } as any].sort((a, b) => a.sortOrder - b.sortOrder));
         const created = await api.options.create(id!, { title: optionData.title, sortOrder: optionData.sortOrder } as any);
         recreatedId = created.id;
         const newOutcomes = await Promise.all(
@@ -205,7 +205,7 @@ export default function DecisionWorkspace() {
             api.outcomes.create(created.id, { description: oc.description, probability: oc.probability, impact: oc.impact, sortOrder: oc.sortOrder } as any)
           )
         );
-        setOptions(prev => prev.map(o => o.id === tempId ? { ...created, outcomes: newOutcomes } : o).sort((a, b) => a.sortOrder - b.sortOrder));
+        setOptions(prev => prev.map(o => o.id === tempId ? { ...created, _stableKey: tempId, outcomes: newOutcomes } as any : o).sort((a, b) => a.sortOrder - b.sortOrder));
       },
     };
     await executeCommand(cmd);
@@ -641,7 +641,7 @@ export default function DecisionWorkspace() {
                     <SortableContext items={options.map(o => o.id)} strategy={verticalListSortingStrategy}>
                       {options.map((option, i) => (
                         <OptionCard
-                          key={option.id}
+                          key={(option as any)._stableKey ?? option.id}
                           option={option}
                           index={i}
                           totalOptions={options.length}
