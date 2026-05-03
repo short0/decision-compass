@@ -8,13 +8,14 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home } from "lucide-react";
+import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home, Loader2 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DecisionSidebar() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [collapsed, setCollapsed] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const { user, isGuest, refetch } = useAuth();
   const navigate = useNavigate();
   const { id: activeId } = useParams();
@@ -34,11 +35,18 @@ export default function DecisionSidebar() {
 
   const confirmDelete = async () => {
     if (!pendingDeleteId) return;
-    await api.decisions.delete(pendingDeleteId);
     const wasActive = activeId === pendingDeleteId;
-    setPendingDeleteId(null);
-    loadDecisions();
+    setDeleting(true);
+    setDecisions((prev) => prev.filter((d) => d.id !== pendingDeleteId));
     if (wasActive) navigate("/");
+    try {
+      await api.decisions.delete(pendingDeleteId);
+    } catch {
+      loadDecisions();
+    } finally {
+      setDeleting(false);
+      setPendingDeleteId(null);
+    }
   };
 
   const handleSignOut = async () => {
@@ -168,13 +176,15 @@ export default function DecisionSidebar() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting} data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
+              disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-delete-confirm"
             >
-              Delete
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+              {deleting ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

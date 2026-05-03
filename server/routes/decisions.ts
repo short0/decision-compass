@@ -147,18 +147,21 @@ decisionsRouter.patch("/:id", async (req, res) => {
 });
 
 decisionsRouter.delete("/:id", async (req, res) => {
-  const [existing] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
+  const id = req.params.id;
+  const [[existing], opts] = await Promise.all([
+    db.select({ userId: decisions.userId }).from(decisions).where(eq(decisions.id, id)).limit(1),
+    db.select({ id: options.id }).from(options).where(eq(options.decisionId, id)),
+  ]);
   if (!existing || existing.userId !== req.session.userId) {
     return res.status(404).json({ error: "Not found" });
   }
-  const opts = await db.select({ id: options.id }).from(options).where(eq(options.decisionId, req.params.id));
   const optIds = opts.map((o) => o.id);
-  if (optIds.length > 0) {
-    await db.delete(outcomes).where(inArray(outcomes.optionId, optIds));
-  }
-  await db.delete(premortems).where(eq(premortems.decisionId, req.params.id));
-  await db.delete(options).where(eq(options.decisionId, req.params.id));
-  await db.delete(decisions).where(eq(decisions.id, req.params.id));
+  await Promise.all([
+    db.delete(premortems).where(eq(premortems.decisionId, id)),
+    optIds.length > 0 ? db.delete(outcomes).where(inArray(outcomes.optionId, optIds)) : Promise.resolve(),
+  ]);
+  await db.delete(options).where(eq(options.decisionId, id));
+  await db.delete(decisions).where(eq(decisions.id, id));
   res.json({ ok: true });
 });
 

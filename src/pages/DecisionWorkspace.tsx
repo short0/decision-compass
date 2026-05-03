@@ -124,12 +124,19 @@ export default function DecisionWorkspace() {
     window.dispatchEvent(new Event("decisions-updated"));
   };
 
+  const [deleting, setDeleting] = useState(false);
+
   const deleteDecision = async () => {
     if (!id) return;
-    await api.decisions.delete(id);
-    window.dispatchEvent(new Event("decisions-updated"));
+    setDeleting(true);
     navigate("/");
-    toast({ title: "Decision deleted" });
+    window.dispatchEvent(new Event("decisions-updated"));
+    try {
+      await api.decisions.delete(id);
+      toast({ title: "Decision deleted" });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const addOption = async () => {
@@ -487,9 +494,10 @@ export default function DecisionWorkspace() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={deleteDecision} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Delete
+                      <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={deleteDecision} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                        {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+                        {deleting ? "Deleting…" : "Delete"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
