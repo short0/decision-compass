@@ -4,19 +4,19 @@ uploads = []
 id = "92X0vy06GCiUlJ1WrO076"
 uri = "file://attached_assets/decy-icon.png"
 type = "image"
-title = "decy compass icon"
+title = "decy compass needle icon"
 
 [[generated]]
 id = "1Aha2YgsQxSAlzvl3Jt8Q"
 uri = "file://attached_assets/decy-wordmark.png"
 type = "image"
-title = "decy wordmark logo"
+title = "decy wordmark with compass icon"
 
 [[outputs]]
 id = "NHeb2Xfv1qsrRbcfBH9Fq"
 uri = "file://attached_assets/decy-icon.png"
 type = "image"
-title = "Decy — App Icon"
+title = "Decy — App Icon (no tick)"
 
 [[outputs]]
 id = "GcwZINFQtroRysP8e3XRR"
