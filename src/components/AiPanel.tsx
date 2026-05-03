@@ -121,7 +121,7 @@ export default function AiPanel({ decision, options, premortems, onClose }: Prop
         )}
       </div>
 
-      <div className="p-3 border-t border-border">
+      <div className="p-3 border-t border-border space-y-2">
         <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
           <Input
             value={input}
@@ -134,6 +134,7 @@ export default function AiPanel({ decision, options, premortems, onClose }: Prop
             <Send className="w-4 h-4" />
           </Button>
         </form>
+        <p className="text-[11px] text-center text-muted-foreground">Decy can make mistakes. Check important info.</p>
       </div>
     </div>
   );
