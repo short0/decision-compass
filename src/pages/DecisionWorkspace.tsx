@@ -61,6 +61,7 @@ export default function DecisionWorkspace() {
 
   const load = useCallback(async () => {
     if (!id) return;
+    setLoading(true);
     try {
       const { decision: d, options: opts, premortems: pms } = await api.decisions.workspace(id);
       if (!d) { navigate("/"); return; }
@@ -71,6 +72,8 @@ export default function DecisionWorkspace() {
       setPremortems(pms || []);
     } catch {
       navigate("/");
+    } finally {
+      setLoading(false);
     }
   }, [id, navigate]);
 
@@ -124,6 +127,7 @@ export default function DecisionWorkspace() {
     window.dispatchEvent(new Event("decisions-updated"));
   };
 
+  const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
 
@@ -448,6 +452,14 @@ export default function DecisionWorkspace() {
   }));
 
   const topRisks = sortedPremortems.slice(0, 5);
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-full">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
