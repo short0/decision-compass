@@ -84,6 +84,8 @@ export default function DecisionWorkspace() {
     setCanRedo(redoStack.current.length > 0);
   };
 
+  const undoRedoInProgress = useRef(false);
+
   const executeCommand = async (cmd: Command) => {
     await cmd.execute();
     undoStack.current = [...undoStack.current, cmd].slice(-20);
@@ -92,23 +94,29 @@ export default function DecisionWorkspace() {
   };
 
   const handleUndo = async () => {
+    if (undoRedoInProgress.current) return;
     const cmd = undoStack.current.at(-1);
     if (!cmd) return;
+    undoRedoInProgress.current = true;
     undoStack.current = undoStack.current.slice(0, -1);
     redoStack.current = [...redoStack.current, cmd].slice(-20);
     syncUndo();
     toast({ title: `Undid: ${cmd.description}` });
-    cmd.unexecute();
+    await cmd.unexecute();
+    undoRedoInProgress.current = false;
   };
 
   const handleRedo = async () => {
+    if (undoRedoInProgress.current) return;
     const cmd = redoStack.current.at(-1);
     if (!cmd) return;
+    undoRedoInProgress.current = true;
     redoStack.current = redoStack.current.slice(0, -1);
     undoStack.current = [...undoStack.current, cmd].slice(-20);
     syncUndo();
     toast({ title: `Redid: ${cmd.description}` });
-    cmd.execute();
+    await cmd.execute();
+    undoRedoInProgress.current = false;
   };
 
   // Keyboard shortcuts
