@@ -42,8 +42,8 @@ const tools: Record<string, any> = {
               type: "object",
               properties: {
                 description: { type: "string" },
-                probability: { type: "number" },
-                impact: { type: "number" },
+                probability: { type: "integer", minimum: 1, maximum: 100, description: "Likelihood as a whole number percentage (e.g. 60 means 60%). All outcomes for this option must sum to 100." },
+                impact: { type: "integer", minimum: -10, maximum: 10, description: "Impact score from -10 (very bad) to +10 (very good). Use the full range meaningfully." },
               },
               required: ["description", "probability", "impact"],
               additionalProperties: false,
@@ -69,8 +69,8 @@ const tools: Record<string, any> = {
               type: "object",
               properties: {
                 description: { type: "string" },
-                probability: { type: "number" },
-                impact: { type: "number" },
+                probability: { type: "integer", minimum: 1, maximum: 100, description: "Likelihood as a whole number percentage (e.g. 60 means 60%). Combined with existing outcomes should sum to ~100." },
+                impact: { type: "integer", minimum: -10, maximum: 10, description: "Impact score from -10 (very bad) to +10 (very good). Use the full range meaningfully." },
               },
               required: ["description", "probability", "impact"],
               additionalProperties: false,
@@ -157,8 +157,8 @@ const tools: Record<string, any> = {
                     type: "object",
                     properties: {
                       description: { type: "string" },
-                      probability: { type: "number" },
-                      impact: { type: "number" },
+                      probability: { type: "integer", minimum: 1, maximum: 100, description: "Likelihood as a whole number percentage (e.g. 60 means 60%). All outcomes for this option must sum to exactly 100." },
+                      impact: { type: "integer", minimum: -10, maximum: 10, description: "Impact score from -10 (very bad) to +10 (very good). Use the full range meaningfully." },
                     },
                     required: ["description", "probability", "impact"],
                     additionalProperties: false,
