@@ -1,7 +1,7 @@
-import { useState, useRef, useLayoutEffect, useEffect } from "react";
+import { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, GripVertical } from "lucide-react";
+import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, GripVertical, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
@@ -99,6 +99,12 @@ export default function OptionCard({
     setLocalOutcomes(reordered);
     onReorderOutcomes(reordered);
   };
+
+  const probSum = useMemo(
+    () => localOutcomes.reduce((s, oc) => s + Number(oc.probability), 0),
+    [localOutcomes]
+  );
+  const showProbWarning = localOutcomes.length > 0 && probSum !== 100;
 
   const optionBias = biases.find(
     b => b.target_type === "option" && option.title.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
@@ -230,6 +236,14 @@ export default function OptionCard({
                   ))}
                 </SortableContext>
               </DndContext>
+              {showProbWarning && (
+                <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-md px-3 py-2">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    Probabilities sum to <span className="font-mono font-semibold">{probSum}%</span> — ideally they should add up to <span className="font-mono font-semibold">100%</span>.
+                  </span>
+                </div>
+              )}
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={onAddOutcome} className="text-xs">
                   <Plus className="w-3 h-3 mr-1" />
