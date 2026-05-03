@@ -130,7 +130,7 @@ export default function OptionCard({
           <button
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none shrink-0"
+            className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <GripVertical className="w-4 h-4" />
           </button>
@@ -318,7 +318,7 @@ function SortableOutcomeRow({
         <button
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none mt-2"
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none mt-2 opacity-0 group-hover/row:opacity-100 transition-opacity"
         >
           <GripVertical className="w-3 h-3" />
         </button>
@@ -359,7 +359,7 @@ function SortableOutcomeRow({
           <button
             {...attributes}
             {...listeners}
-            className="cursor-grab active:cursor-grabbing text-muted-foreground touch-none"
+            className="cursor-grab active:cursor-grabbing text-muted-foreground touch-none opacity-0 group-hover/row:opacity-100 transition-opacity"
           >
             <GripVertical className="w-4 h-4" />
           </button>
