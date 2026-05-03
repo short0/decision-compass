@@ -18,19 +18,11 @@ function requireAuth(req: any, res: any, next: any) {
 aiRouter.use(requireAuth);
 
 const systemPrompts: Record<string, string> = {
-  suggest_options: `Decision analysis expert (Annie Duke). Suggest ONE new alternative option with 2-3 outcomes. Be concrete. Probabilities are whole numbers summing to 100. Impact: -10 to +10.`,
-  suggest_outcomes: `Decision analysis expert. For the given option, suggest 2-3 additional outcomes (positive and negative). Probabilities are whole numbers. Combined with existing ones they should sum ~100. Impact: -10 to +10.`,
-  check_biases: `Cognitive bias expert (Annie Duke). Identify specific cognitive biases in the decision. For each: name it, cite which element it applies to, explain in 1-2 sentences.`,
-  suggest_premortems: `Premortem expert (Gary Klein). Assume the decision already failed. List 3-5 specific, concrete failure reasons the user may have missed.`,
-  auto_generate: `Decision analysis expert (Annie Duke). Given a decision, generate a complete analysis: 2-4 options each with 2-3 outcomes, plus 3-5 premortem risks. Be concrete and balanced. Each option's outcome probabilities MUST sum to exactly 100 (whole numbers). Impact: -10 to +10.`,
-};
-
-const maxTokens: Record<string, number> = {
-  suggest_options: 400,
-  suggest_outcomes: 300,
-  check_biases: 500,
-  suggest_premortems: 400,
-  auto_generate: 1200,
+  suggest_options: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user is making a decision. Based on the context provided, suggest ONE new alternative option they may not have considered, with 2-3 possible outcomes. Be concrete and specific. IMPORTANT: Probabilities must be whole numbers (e.g. 60, not 0.6) and should sum to 100 for all outcomes of the option. Impact is on a scale of -10 to +10.`,
+  suggest_outcomes: `You are a decision analysis expert. For the specific option provided, suggest 2-3 additional outcomes the user may have missed, including both positive and negative scenarios. IMPORTANT: Probabilities must be whole numbers (e.g. 60, not 0.6). When combined with existing outcomes, all probabilities for this option should sum to approximately 100. Impact is on a scale of -10 to +10.`,
+  check_biases: `You are a cognitive bias expert inspired by Annie Duke's work. Analyze the user's decision framework and identify specific cognitive biases. For each bias found, specify which element it relates to (an option title, outcome description, or premortem reason). Be direct and cite specific bias names. For each bias, provide a concise explanation (1-2 sentences max) and include a brief real-world example.`,
+  suggest_premortems: `You are a premortem analysis expert inspired by Gary Klein's premortem technique. Imagine this decision has already failed. Identify 3-5 specific, concrete reasons why it could fail. Consider risks the user may have overlooked. Be specific and actionable.`,
+  auto_generate: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user will give you a decision title and context. You must generate a complete decision analysis with options, outcomes, and premortem risks. Be concrete, realistic, and balanced. IMPORTANT: For each option, the probabilities of all outcomes MUST sum to exactly 100. Use whole numbers (e.g. 60, not 0.6). Impact is on a scale of -10 to +10.`,
 };
 
 const tools: Record<string, any> = {
@@ -207,18 +199,18 @@ const toolNames: Record<string, string> = {
 
 function buildUserContent(action: string, decision: any) {
   if (action === "auto_generate") {
-    return `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}`;
+    return `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}\n\nPlease generate a complete decision analysis.`;
   }
   if (action === "suggest_outcomes") {
-    return `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}\nOption: "${decision.target_option_title}"\nExisting outcomes: ${decision.target_option_outcomes?.map((o: any) => o.description).join(", ") || "None"}`;
+    return `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}\n\nSpecific option to suggest outcomes for: "${decision.target_option_title}"\nExisting outcomes: ${decision.target_option_outcomes?.map((o: any) => o.description).join(", ") || "None"}\n\nSuggest additional outcomes.`;
   }
   const optionsText = decision.options?.map((o: any, i: number) =>
-    `${i + 1}. ${o.title}${o.outcomes?.length > 0 ? ": " + o.outcomes.map((oc: any) => `${oc.description} (${oc.probability}%, ${oc.impact > 0 ? "+" : ""}${oc.impact})`).join("; ") : ""}`
-  ).join("\n") || "None";
+    `${i + 1}. ${o.title}${o.outcomes?.length > 0 ? "\n   Outcomes: " + o.outcomes.map((oc: any) => `${oc.description} (${oc.probability}%, impact: ${oc.impact})`).join("; ") : ""}`
+  ).join("\n") || "No options defined yet";
   const premText = decision.premortems?.length > 0
-    ? decision.premortems.map((p: any) => `[${p.severity}] ${p.reason}`).join("\n")
-    : "None";
-  return `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}\nOptions:\n${optionsText}\nRisks:\n${premText}`;
+    ? decision.premortems.map((p: any) => `- [${p.severity}] ${p.reason}`).join("\n")
+    : "None defined yet";
+  return `Decision: ${decision.title}\nContext: ${decision.context || "Not provided"}\n\nOptions:\n${optionsText}\n\nPremortem Risks:\n${premText}\n\nPlease analyze.`;
 }
 
 aiRouter.post("/assist", async (req, res) => {
@@ -235,8 +227,6 @@ aiRouter.post("/assist", async (req, res) => {
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.7,
-      max_tokens: maxTokens[action],
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: buildUserContent(action, decision) },
@@ -263,17 +253,21 @@ aiRouter.post("/assist", async (req, res) => {
 aiRouter.post("/chat", async (req, res) => {
   const { messages, decision_context } = req.body;
 
-  const systemPrompt = `Decision analysis assistant. Help users think through decisions clearly.
+  const systemPrompt = `You are a decision analysis assistant. You help users think through decisions clearly.
 
-Context: ${decision_context}
+Current Decision Context:
+${decision_context}
 
-Rules: Be concise (max 3-4 sentences). Use bullets for lists. Challenge assumptions. No filler phrases. Markdown sparingly.`;
+RULES:
+- Be concise and direct. Max 3-4 sentences per response unless more detail is explicitly asked for.
+- Use bullet points for lists.
+- Challenge assumptions briefly.
+- No filler phrases like "That's a great question" or "I'd be happy to help".
+- Use markdown sparingly.`;
 
   try {
     const stream = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      temperature: 0.7,
-      max_tokens: 300,
       messages: [{ role: "system", content: systemPrompt }, ...messages],
       stream: true,
     });
