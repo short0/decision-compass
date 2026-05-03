@@ -671,18 +671,6 @@ export default function DecisionWorkspace() {
                             </div>
                           ))}
                         </div>
-                        <div className="space-y-1">
-                          {sortedPremortems.map(pm => {
-                            const rs = getRiskScore(pm.frequency || "possible", pm.severity || "moderate");
-                            return (
-                              <div key={pm.id} className="flex items-center gap-2 text-sm py-1 border-b border-border/50 last:border-0">
-                                <span className={`shrink-0 w-8 text-center text-xs px-1 py-0.5 rounded font-bold ${rs >= 20 ? "bg-destructive/20 text-destructive" : rs >= 12 ? "bg-destructive/10 text-destructive" : rs >= 6 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"}`}>{rs}</span>
-                                <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${getImpactColorClass(pm.severity || "moderate")}`}>{pm.severity}</span>
-                                <span className="text-muted-foreground text-xs leading-snug truncate">{pm.reason}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
                       </div>
                     )}
                   </div>
