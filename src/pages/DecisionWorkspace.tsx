@@ -454,7 +454,7 @@ export default function DecisionWorkspace() {
       <div className="flex flex-col h-full">
         <div className={`flex-1 transition-all flex flex-col ${showAi ? "mr-80 lg:mr-96" : ""}`}>
           <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
-            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-end">
               <div className="flex items-center gap-1">
                 <Button
                   variant="ghost"
