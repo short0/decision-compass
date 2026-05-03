@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Sparkles, Send } from "lucide-react";
-import CompassSpinner from "@/components/CompassSpinner";
+import { X, Sparkles, Loader2, Send } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { api, type Decision, type Option, type Outcome, type Premortem } from "@/lib/api";
 
@@ -137,7 +136,7 @@ export default function AiPanel({ decision, options, premortems, onClose }: Prop
               <Sparkles className="w-3 h-3 text-primary" />
             </div>
             <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2">
-              <CompassSpinner size={14} />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             </div>
           </div>
         )}

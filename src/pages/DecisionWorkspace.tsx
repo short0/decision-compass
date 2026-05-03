@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Plus, Trash2, Sparkles, CheckCircle2, Target, Shield, Wand2,
+  Plus, Trash2, Sparkles, CheckCircle2, Target, Shield, Wand2, Loader2,
   Brain, X, ClipboardCheck, TrendingUp, AlertTriangle, Undo2, Redo2,
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -566,7 +566,7 @@ export default function DecisionWorkspace() {
                     <AlertDialogFooter>
                       <AlertDialogCancel ref={deleteCancelRef} disabled={deleting} className="focus:ring-2 focus:ring-offset-2 focus:ring-ring">Cancel</AlertDialogCancel>
                       <AlertDialogAction onClick={deleteDecision} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        {deleting ? <CompassSpinner size={16} /> : null}
+                        {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                         {deleting ? "Deleting…" : "Delete"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
@@ -603,11 +603,11 @@ export default function DecisionWorkspace() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={autoGenerate} disabled={generating || !title.trim()} data-testid="button-auto-generate">
-                  {generating ? <CompassSpinner size={16} /> : <Wand2 className="w-4 h-4 mr-2" />}
+                  {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
                   {generating ? "Generating..." : "Auto-Generate with AI"}
                 </Button>
                 <Button variant="outline" onClick={checkBiases} disabled={checkingBiases || options.length === 0} data-testid="button-check-biases">
-                  {checkingBiases ? <CompassSpinner size={16} /> : <Brain className="w-4 h-4 mr-2" />}
+                  {checkingBiases ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Brain className="w-4 h-4 mr-2" />}
                   {checkingBiases ? "Checking..." : "Check Biases"}
                 </Button>
                 {biases.length > 0 && (
@@ -667,7 +667,7 @@ export default function DecisionWorkspace() {
                       Add Option
                     </Button>
                     <Button variant="workspace" onClick={suggestOption} disabled={suggestingOption || !title.trim()} className="flex-1 py-6" data-testid="button-suggest-option">
-                      {suggestingOption ? <CompassSpinner size={16} /> : <Sparkles className="w-4 h-4 mr-1" />}
+                      {suggestingOption ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
                       {suggestingOption ? "Suggesting..." : "Suggest Option"}
                     </Button>
                   </div>

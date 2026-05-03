@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Sparkles } from "lucide-react";
-import CompassSpinner from "@/components/CompassSpinner";
+import { ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import decyIconUrl from "@assets/decy-icon.png";
 import { motion } from "framer-motion";
 
@@ -281,7 +280,7 @@ export default function HomePage() {
               size="sm"
               data-testid="button-start"
             >
-              {creating ? <CompassSpinner size={16} /> : null}
+              {creating ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
               {creating ? "Creating..." : "Start Analysis"}
               {!creating && <ArrowRight className="w-4 h-4 ml-1" />}
             </Button>
@@ -304,7 +303,7 @@ export default function HomePage() {
               >
                 {loadingPreset === preset.label && (
                   <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-card/80">
-                    <CompassSpinner size={28} />
+                    <Loader2 className="w-5 h-5 animate-spin text-primary" />
                   </div>
                 )}
                 <div className="flex items-center gap-1.5">

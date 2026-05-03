@@ -8,8 +8,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home } from "lucide-react";
-import CompassSpinner from "@/components/CompassSpinner";
+import { Plus, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home, Loader2 } from "lucide-react";
 import decyIconUrl from "@assets/decy-icon.png";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -265,7 +264,7 @@ export default function DecisionSidebar() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               data-testid="button-delete-confirm"
             >
-              {deleting ? <CompassSpinner size={16} /> : null}
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
               {deleting ? "Deleting…" : "Delete"}
             </AlertDialogAction>
           </AlertDialogFooter>
