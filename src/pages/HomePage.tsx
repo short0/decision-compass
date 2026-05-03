@@ -199,7 +199,7 @@ export default function HomePage() {
     try {
       const lines = trimmed.split("\n");
       const title = lines[0].slice(0, 100) || "Untitled Decision";
-      const data = await api.decisions.create({ title, context: "" });
+      const data = await api.decisions.create({ title, context: trimmed });
       window.dispatchEvent(new Event("decisions-updated"));
       navigate(`/decision/${data.id}`);
     } catch {
