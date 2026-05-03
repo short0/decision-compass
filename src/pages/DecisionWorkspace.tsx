@@ -146,21 +146,23 @@ export default function DecisionWorkspace() {
 
   const addOption = async () => {
     if (!id) return;
-    let createdId: string | null = null;
+    const tempId = `temp-${Date.now()}`;
     const sortOrder = options.length;
+    let createdId: string | null = null;
     const cmd: Command = {
       description: "Add option",
       execute: async () => {
+        setOptions(prev => [...prev, { id: tempId, decisionId: id, title: `Option ${sortOrder + 1}`, description: null, sortOrder, createdAt: new Date().toISOString(), outcomes: [] } as any]);
         const created = await api.options.create(id, { title: `Option ${sortOrder + 1}`, sortOrder } as any);
         createdId = created.id;
-        setOptions(prev => [...prev, { ...created, outcomes: [] }]);
+        setOptions(prev => prev.map(o => o.id === tempId ? { ...created, outcomes: [] } : o));
       },
       unexecute: async () => {
         if (createdId) {
-          await api.options.delete(createdId);
           const deleted = createdId;
           createdId = null;
           setOptions(prev => prev.filter(o => o.id !== deleted));
+          await api.options.delete(deleted);
         }
       },
     };
@@ -175,9 +177,9 @@ export default function DecisionWorkspace() {
       description: "Delete option",
       execute: async () => {
         const toDelete = recreatedId || optionId;
-        await api.options.delete(toDelete);
         recreatedId = null;
         setOptions(prev => prev.filter(o => o.id !== toDelete));
+        await api.options.delete(toDelete);
       },
       unexecute: async () => {
         const created = await api.options.create(id!, { title: optionData.title, sortOrder: optionData.sortOrder } as any);
@@ -200,20 +202,22 @@ export default function DecisionWorkspace() {
   const addOutcome = async (optionId: string) => {
     const opt = options.find(o => o.id === optionId);
     const sortOrder = opt ? opt.outcomes.length : 0;
+    const tempId = `temp-${Date.now()}`;
     let createdId: string | null = null;
     const cmd: Command = {
       description: "Add outcome",
       execute: async () => {
+        setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: [...o.outcomes, { id: tempId, optionId, description: "New outcome", probability: 50, impact: 0, sortOrder, createdAt: new Date().toISOString() } as any] } : o));
         const created = await api.outcomes.create(optionId, { description: "New outcome", probability: 50, impact: 0, sortOrder } as any);
         createdId = created.id;
-        setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: [...o.outcomes, created] } : o));
+        setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: o.outcomes.map(oc => oc.id === tempId ? created : oc) } : o));
       },
       unexecute: async () => {
         if (createdId) {
-          await api.outcomes.delete(createdId);
           const deleted = createdId;
           createdId = null;
           setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: o.outcomes.filter(oc => oc.id !== deleted) } : o));
+          await api.outcomes.delete(deleted);
         }
       },
     };
@@ -248,9 +252,9 @@ export default function DecisionWorkspace() {
       description: "Delete outcome",
       execute: async () => {
         const toDelete = recreatedId || outcomeId;
-        await api.outcomes.delete(toDelete);
         recreatedId = null;
         setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: o.outcomes.filter(oc => oc.id !== toDelete) } : o));
+        await api.outcomes.delete(toDelete);
       },
       unexecute: async () => {
         const created = await api.outcomes.create(parentOptionId!, { description: outcomeData!.description, probability: outcomeData!.probability, impact: outcomeData!.impact, sortOrder: outcomeData!.sortOrder } as any);
