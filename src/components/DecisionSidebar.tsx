@@ -3,12 +3,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { api, type Decision } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DecisionSidebar() {
   const [decisions, setDecisions] = useState<Decision[]>([]);
   const [collapsed, setCollapsed] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const { user, isGuest, refetch } = useAuth();
   const navigate = useNavigate();
   const { id: activeId } = useParams();
@@ -26,11 +32,13 @@ export default function DecisionSidebar() {
     }
   };
 
-  const deleteDecision = async (e: React.MouseEvent, decisionId: string) => {
-    e.stopPropagation();
-    await api.decisions.delete(decisionId);
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    await api.decisions.delete(pendingDeleteId);
+    const wasActive = activeId === pendingDeleteId;
+    setPendingDeleteId(null);
     loadDecisions();
-    if (activeId === decisionId) navigate("/");
+    if (wasActive) navigate("/");
   };
 
   const handleSignOut = async () => {
@@ -112,7 +120,7 @@ export default function DecisionSidebar() {
               variant="ghost"
               size="icon"
               className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
-              onClick={(e) => deleteDecision(e, d.id)}
+              onClick={(e) => { e.stopPropagation(); setPendingDeleteId(d.id); }}
               data-testid={`button-delete-decision-${d.id}`}
             >
               <Trash2 className="w-3 h-3" />
@@ -150,6 +158,27 @@ export default function DecisionSidebar() {
           </Button>
         )}
       </div>
+
+      <AlertDialog open={!!pendingDeleteId} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this decision?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the decision and all its options, outcomes, and risks. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-delete-confirm"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
