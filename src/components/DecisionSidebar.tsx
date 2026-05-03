@@ -67,22 +67,18 @@ export default function DecisionSidebar() {
     return (
       <TooltipProvider delayDuration={300}>
         <div className="w-12 border-r border-border bg-sidebar-background flex flex-col items-center py-3 gap-1 shrink-0 h-full">
-          {/* Top: expand + logo */}
+          {/* Top: logo — hover reveals expand icon */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCollapsed(false)}>
-                <PanelLeft className="w-4 h-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">Expand sidebar</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button onClick={() => navigate("/")} className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors mt-1">
-                <Scale className="w-4 h-4 text-primary" />
+              <button
+                onClick={() => setCollapsed(false)}
+                className="group relative h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors"
+              >
+                <Scale className="w-4 h-4 text-primary transition-opacity group-hover:opacity-0" />
+                <PanelLeft className="w-4 h-4 absolute inset-0 m-auto opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="right">Decy — Home</TooltipContent>
+            <TooltipContent side="right">Expand sidebar</TooltipContent>
           </Tooltip>
 
           <div className="w-8 border-t border-border my-1" />
