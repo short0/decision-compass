@@ -220,6 +220,13 @@ export default function DecisionWorkspace() {
     await executeCommand(cmd);
   };
 
+  const updateOutcomeLive = (outcomeId: string, updates: Partial<Outcome>) => {
+    setOptions(prev => prev.map(o => ({
+      ...o,
+      outcomes: o.outcomes.map(oc => oc.id === outcomeId ? { ...oc, ...updates } : oc),
+    })));
+  };
+
   const updateOutcome = (outcomeId: string, updates: Partial<Outcome>) => {
     setOptions(prev => prev.map(o => ({
       ...o,
@@ -606,6 +613,7 @@ export default function DecisionWorkspace() {
                           onDelete={() => deleteOption(option.id)}
                           onAddOutcome={() => addOutcome(option.id)}
                           onUpdateOutcome={updateOutcome}
+                          onUpdateOutcomeLive={updateOutcomeLive}
                           onDeleteOutcome={deleteOutcome}
                           onReorderOutcomes={(reordered) => reorderOutcomes(option.id, reordered)}
                           onSuggestOutcomes={suggestOutcomes}

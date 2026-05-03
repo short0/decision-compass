@@ -38,6 +38,7 @@ interface Props {
   onDelete: () => void;
   onAddOutcome: () => void;
   onUpdateOutcome: (id: string, updates: Partial<Outcome>) => void;
+  onUpdateOutcomeLive: (id: string, updates: Partial<Outcome>) => void;
   onDeleteOutcome: (id: string) => void;
   onReorderOutcomes: (reordered: Outcome[]) => void;
   onSuggestOutcomes: (optionId: string) => void;
@@ -57,7 +58,7 @@ function useAutoResize(value: string) {
 
 export default function OptionCard({
   option, index, totalOptions, ev, biases, onUpdate, onDelete,
-  onAddOutcome, onUpdateOutcome, onDeleteOutcome,
+  onAddOutcome, onUpdateOutcome, onUpdateOutcomeLive, onDeleteOutcome,
   onReorderOutcomes, onSuggestOutcomes, suggestingOutcomes,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
@@ -223,6 +224,7 @@ export default function OptionCard({
                         b => b.target_type === "outcome" && oc.description.toLowerCase().includes(b.target_label.toLowerCase().slice(0, 20))
                       )}
                       onUpdate={onUpdateOutcome}
+                      onUpdateLive={onUpdateOutcomeLive}
                       onDelete={onDeleteOutcome}
                     />
                   ))}
@@ -260,11 +262,13 @@ function SortableOutcomeRow({
   outcome,
   bias,
   onUpdate,
+  onUpdateLive,
   onDelete,
 }: {
   outcome: Outcome;
   bias?: BiasAnnotation;
   onUpdate: (id: string, updates: Partial<Outcome>) => void;
+  onUpdateLive: (id: string, updates: Partial<Outcome>) => void;
   onDelete: (id: string) => void;
 }) {
   const [desc, setDesc] = useState(outcome.description);
@@ -318,7 +322,7 @@ function SortableOutcomeRow({
           min={0}
           max={100}
           value={prob}
-          onChange={(e) => setProb(e.target.value)}
+          onChange={(e) => { setProb(e.target.value); onUpdateLive(outcome.id, { probability: Number(e.target.value) }); }}
           onBlur={() => onUpdate(outcome.id, { probability: Number(prob) })}
           className="h-9 text-sm text-center font-mono"
         />
@@ -328,7 +332,7 @@ function SortableOutcomeRow({
           max={10}
           step={0.5}
           value={impact}
-          onChange={(e) => setImpact(e.target.value)}
+          onChange={(e) => { setImpact(e.target.value); onUpdateLive(outcome.id, { impact: Number(e.target.value) }); }}
           onBlur={() => onUpdate(outcome.id, { impact: Number(impact) })}
           className="h-9 text-sm text-center font-mono"
         />
@@ -365,7 +369,7 @@ function SortableOutcomeRow({
               min={0}
               max={100}
               value={prob}
-              onChange={(e) => setProb(e.target.value)}
+              onChange={(e) => { setProb(e.target.value); onUpdateLive(outcome.id, { probability: Number(e.target.value) }); }}
               onBlur={() => onUpdate(outcome.id, { probability: Number(prob) })}
               className="h-8 text-sm text-center font-mono"
             />
@@ -378,7 +382,7 @@ function SortableOutcomeRow({
               max={10}
               step={0.5}
               value={impact}
-              onChange={(e) => setImpact(e.target.value)}
+              onChange={(e) => { setImpact(e.target.value); onUpdateLive(outcome.id, { impact: Number(e.target.value) }); }}
               onBlur={() => onUpdate(outcome.id, { impact: Number(impact) })}
               className="h-8 text-sm text-center font-mono"
             />
