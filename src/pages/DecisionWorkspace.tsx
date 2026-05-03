@@ -478,8 +478,6 @@ export default function DecisionWorkspace() {
                 >
                   <Redo2 className="w-4 h-4" />
                 </Button>
-              </div>
-              <div className="flex items-center gap-1">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
