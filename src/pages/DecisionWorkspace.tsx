@@ -220,8 +220,12 @@ export default function DecisionWorkspace() {
     await executeCommand(cmd);
   };
 
-  const updateOutcome = async (outcomeId: string, updates: Partial<Outcome>) => {
-    await api.outcomes.update(outcomeId, updates);
+  const updateOutcome = (outcomeId: string, updates: Partial<Outcome>) => {
+    setOptions(prev => prev.map(o => ({
+      ...o,
+      outcomes: o.outcomes.map(oc => oc.id === outcomeId ? { ...oc, ...updates } : oc),
+    })));
+    api.outcomes.update(outcomeId, updates);
   };
 
   const deleteOutcome = async (outcomeId: string) => {
