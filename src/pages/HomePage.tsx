@@ -246,6 +246,14 @@ export default function HomePage() {
 
   const busy = creating || !!loadingPreset;
 
+  if (busy) {
+    return (
+      <div className="flex-1 flex items-center justify-center h-full">
+        <CompassSpinner size={56} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-start justify-center min-h-full p-4 pt-12 overflow-y-auto">
       <motion.div
