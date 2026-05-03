@@ -77,6 +77,12 @@ export const api = {
     workspace: (id: string) => req<{ decision: Decision; options: (Option & { outcomes: Outcome[] })[]; premortems: Premortem[] }>(`/api/decisions/${id}/workspace`),
     create: (data: { title: string; context?: string }) =>
       req<Decision>("/api/decisions", { method: "POST", body: JSON.stringify(data) }),
+    seed: (data: {
+      title: string;
+      context?: string;
+      options: { title: string; outcomes: { description: string; probability: number; impact: number }[] }[];
+      premortems: { reason: string; severity: string; frequency: string }[];
+    }) => req<{ id: string }>("/api/decisions/seed", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Decision>) =>
       req<Decision>(`/api/decisions/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     delete: (id: string) => req<{ ok: boolean }>(`/api/decisions/${id}`, { method: "DELETE" }),

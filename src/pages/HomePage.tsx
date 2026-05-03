@@ -209,36 +209,23 @@ export default function HomePage() {
     if (!user || loadingPreset) return;
     setLoadingPreset(preset.label);
     try {
-      const decision = await api.decisions.create({ title: preset.title, context: preset.context });
-      const decisionId = decision.id;
-
-      for (let i = 0; i < preset.options.length; i++) {
-        const opt = preset.options[i];
-        const createdOption = await api.options.create(decisionId, {
-          title: opt.title,
-          sortOrder: i,
-        } as any);
-        for (let j = 0; j < opt.outcomes.length; j++) {
-          const oc = opt.outcomes[j];
-          await api.outcomes.create(createdOption.id, {
+      const { id: decisionId } = await api.decisions.seed({
+        title: preset.title,
+        context: preset.context,
+        options: preset.options.map((o) => ({
+          title: o.title,
+          outcomes: o.outcomes.map((oc) => ({
             description: oc.description,
             probability: oc.probability,
             impact: oc.impact,
-            sortOrder: j,
-          } as any);
-        }
-      }
-
-      for (let i = 0; i < preset.premortems.length; i++) {
-        const pm = preset.premortems[i];
-        await api.premortems.create(decisionId, {
+          })),
+        })),
+        premortems: preset.premortems.map((pm) => ({
           reason: pm.reason,
           severity: pm.severity,
           frequency: pm.frequency,
-          sortOrder: i,
-        } as any);
-      }
-
+        })),
+      });
       window.dispatchEvent(new Event("decisions-updated"));
       navigate(`/decision/${decisionId}`);
     } catch {

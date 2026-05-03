@@ -67,6 +67,66 @@ decisionsRouter.post("/", async (req, res) => {
   res.json(d);
 });
 
+decisionsRouter.post("/seed", async (req, res) => {
+  const { title, context, options: optionsData, premortems: premortems_data } = req.body;
+  if (!title) return res.status(400).json({ error: "Title required" });
+
+  const [d] = await db
+    .insert(decisions)
+    .values({ title, context: context || null, userId: req.session.userId! })
+    .returning();
+
+  const decisionId = d.id;
+
+  const insertedOptions: any[] = [];
+  if (optionsData?.length > 0) {
+    const optRows = await db
+      .insert(options)
+      .values(optionsData.map((o: any, i: number) => ({
+        decisionId,
+        title: o.title,
+        description: o.description || null,
+        sortOrder: i,
+      })))
+      .returning();
+    insertedOptions.push(...optRows);
+
+    const outcomeValues: any[] = [];
+    for (let i = 0; i < optionsData.length; i++) {
+      const opt = optionsData[i];
+      const createdOpt = insertedOptions[i];
+      if (opt.outcomes?.length > 0) {
+        opt.outcomes.forEach((oc: any, j: number) => {
+          outcomeValues.push({
+            optionId: createdOpt.id,
+            description: oc.description,
+            probability: String(oc.probability),
+            impact: String(oc.impact),
+            sortOrder: j,
+          });
+        });
+      }
+    }
+    if (outcomeValues.length > 0) {
+      await db.insert(outcomes).values(outcomeValues);
+    }
+  }
+
+  if (premortems_data?.length > 0) {
+    await db.insert(premortems).values(
+      premortems_data.map((pm: any, i: number) => ({
+        decisionId,
+        reason: pm.reason,
+        severity: pm.severity || "moderate",
+        frequency: pm.frequency || "possible",
+        sortOrder: i,
+      }))
+    );
+  }
+
+  res.json({ id: decisionId });
+});
+
 decisionsRouter.patch("/:id", async (req, res) => {
   const [existing] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
   if (!existing || existing.userId !== req.session.userId) {
