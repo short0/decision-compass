@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Scale, ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import { ArrowRight, Sparkles, Loader2 } from "lucide-react";
+import decyIconUrl from "@assets/decy-icon.png";
 import { motion } from "framer-motion";
 
 type PresetOutcome = { description: string; probability: number; impact: number };
@@ -252,7 +253,7 @@ export default function HomePage() {
         className="w-full max-w-2xl space-y-8"
       >
         <div className="text-center space-y-3">
-          <Scale className="w-10 h-10 text-primary mx-auto" />
+          <img src={decyIconUrl} alt="Decy" className="w-12 h-12 mx-auto" />
           <h1 className="text-2xl font-semibold text-foreground">
             What decision are you facing?
           </h1>

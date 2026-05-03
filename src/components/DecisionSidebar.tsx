@@ -8,7 +8,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home, Loader2 } from "lucide-react";
+import { Plus, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home, Loader2 } from "lucide-react";
+import decyIconUrl from "@assets/decy-icon.png";
+import decyWordmarkUrl from "@assets/decy-wordmark.svg";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "@/components/ThemeToggle";
 
@@ -74,7 +76,7 @@ export default function DecisionSidebar() {
                 onClick={() => setCollapsed(false)}
                 className="group relative h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors"
               >
-                <Scale className="w-4 h-4 text-primary transition-opacity group-hover:opacity-0" />
+                <img src={decyIconUrl} alt="Decy" className="w-5 h-5 transition-opacity group-hover:opacity-0" />
                 <PanelLeft className="w-4 h-4 absolute inset-0 m-auto opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             </TooltipTrigger>
@@ -160,8 +162,8 @@ export default function DecisionSidebar() {
           className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           data-testid="link-home-logo"
         >
-          <Scale className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm">Decy</span>
+          <img src={decyIconUrl} alt="" className="h-5 w-5" />
+          <span className="font-semibold text-sm tracking-tight">Decy</span>
         </button>
         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setCollapsed(true)}>
           <PanelLeftClose className="w-4 h-4" />
