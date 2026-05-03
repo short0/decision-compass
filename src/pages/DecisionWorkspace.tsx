@@ -62,15 +62,13 @@ export default function DecisionWorkspace() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const d = await api.decisions.get(id);
+      const { decision: d, options: opts, premortems: pms } = await api.decisions.workspace(id);
       if (!d) { navigate("/"); return; }
       setDecision(d);
       setTitle(d.title);
       setContext(d.context || "");
-      const opts = await api.options.list(id);
       setOptions(opts || []);
-      const pm = await api.premortems.list(id);
-      setPremortems(pm || []);
+      setPremortems(pms || []);
     } catch {
       navigate("/");
     }
@@ -143,10 +141,15 @@ export default function DecisionWorkspace() {
       execute: async () => {
         const created = await api.options.create(id, { title: `Option ${sortOrder + 1}`, sortOrder } as any);
         createdId = created.id;
-        await load();
+        setOptions(prev => [...prev, { ...created, outcomes: [] }]);
       },
       unexecute: async () => {
-        if (createdId) { await api.options.delete(createdId); createdId = null; await load(); }
+        if (createdId) {
+          await api.options.delete(createdId);
+          const deleted = createdId;
+          createdId = null;
+          setOptions(prev => prev.filter(o => o.id !== deleted));
+        }
       },
     };
     await executeCommand(cmd);
@@ -162,15 +165,17 @@ export default function DecisionWorkspace() {
         const toDelete = recreatedId || optionId;
         await api.options.delete(toDelete);
         recreatedId = null;
-        await load();
+        setOptions(prev => prev.filter(o => o.id !== toDelete));
       },
       unexecute: async () => {
         const created = await api.options.create(id!, { title: optionData.title, sortOrder: optionData.sortOrder } as any);
         recreatedId = created.id;
-        for (const oc of optionData.outcomes) {
-          await api.outcomes.create(created.id, { description: oc.description, probability: oc.probability, impact: oc.impact, sortOrder: oc.sortOrder } as any);
-        }
-        await load();
+        const newOutcomes = await Promise.all(
+          optionData.outcomes.map(oc =>
+            api.outcomes.create(created.id, { description: oc.description, probability: oc.probability, impact: oc.impact, sortOrder: oc.sortOrder } as any)
+          )
+        );
+        setOptions(prev => [...prev, { ...created, outcomes: newOutcomes }].sort((a, b) => a.sortOrder - b.sortOrder));
       },
     };
     await executeCommand(cmd);
@@ -189,10 +194,15 @@ export default function DecisionWorkspace() {
       execute: async () => {
         const created = await api.outcomes.create(optionId, { description: "New outcome", probability: 50, impact: 0, sortOrder } as any);
         createdId = created.id;
-        await load();
+        setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: [...o.outcomes, created] } : o));
       },
       unexecute: async () => {
-        if (createdId) { await api.outcomes.delete(createdId); createdId = null; await load(); }
+        if (createdId) {
+          await api.outcomes.delete(createdId);
+          const deleted = createdId;
+          createdId = null;
+          setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: o.outcomes.filter(oc => oc.id !== deleted) } : o));
+        }
       },
     };
     await executeCommand(cmd);
@@ -217,12 +227,12 @@ export default function DecisionWorkspace() {
         const toDelete = recreatedId || outcomeId;
         await api.outcomes.delete(toDelete);
         recreatedId = null;
-        await load();
+        setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: o.outcomes.filter(oc => oc.id !== toDelete) } : o));
       },
       unexecute: async () => {
         const created = await api.outcomes.create(parentOptionId!, { description: outcomeData!.description, probability: outcomeData!.probability, impact: outcomeData!.impact, sortOrder: outcomeData!.sortOrder } as any);
         recreatedId = created.id;
-        await load();
+        setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: [...o.outcomes, created].sort((a, b) => a.sortOrder - b.sortOrder) } : o));
       },
     };
     await executeCommand(cmd);
@@ -258,10 +268,15 @@ export default function DecisionWorkspace() {
       execute: async () => {
         const created = await api.premortems.create(id, { reason: "New risk", severity: "moderate", frequency: "possible", sortOrder } as any);
         createdId = created.id;
-        await load();
+        setPremortems(prev => [...prev, created]);
       },
       unexecute: async () => {
-        if (createdId) { await api.premortems.delete(createdId); createdId = null; await load(); }
+        if (createdId) {
+          await api.premortems.delete(createdId);
+          const deleted = createdId;
+          createdId = null;
+          setPremortems(prev => prev.filter(p => p.id !== deleted));
+        }
       },
     };
     await executeCommand(cmd);
@@ -282,12 +297,12 @@ export default function DecisionWorkspace() {
         const toDelete = recreatedId || pmId;
         await api.premortems.delete(toDelete);
         recreatedId = null;
-        await load();
+        setPremortems(prev => prev.filter(p => p.id !== toDelete));
       },
       unexecute: async () => {
         const created = await api.premortems.create(id!, { reason: pmData.reason, severity: pmData.severity, frequency: pmData.frequency, sortOrder: pmData.sortOrder } as any);
         recreatedId = created.id;
-        await load();
+        setPremortems(prev => [...prev, created].sort((a, b) => a.sortOrder - b.sortOrder));
       },
     };
     await executeCommand(cmd);
@@ -311,21 +326,26 @@ export default function DecisionWorkspace() {
     try {
       const { generated: gen } = await api.ai.assist("auto_generate", { title, context });
       if (!gen?.options) throw new Error("No data generated");
+      const newOptions: (Option & { outcomes: Outcome[] })[] = [];
       for (let i = 0; i < gen.options.length; i++) {
         const opt = gen.options[i];
         const inserted = await api.options.create(id, { title: opt.title, description: opt.description || null, sort_order: options.length + i } as any);
+        const newOutcomes: Outcome[] = [];
         if (inserted && opt.outcomes) {
-          for (const oc of opt.outcomes) {
-            await api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any);
-          }
+          const created = await Promise.all(opt.outcomes.map((oc: any) =>
+            api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any)
+          ));
+          newOutcomes.push(...created);
         }
+        newOptions.push({ ...inserted, outcomes: newOutcomes });
       }
+      setOptions(prev => [...prev, ...newOptions]);
       if (gen.premortems) {
-        for (const pm of gen.premortems) {
-          await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any);
-        }
+        const newPms = await Promise.all(gen.premortems.map((pm: any) =>
+          api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any)
+        ));
+        setPremortems(prev => [...prev, ...newPms]);
       }
-      await load();
       toast({ title: "AI generated options, outcomes & risks!" });
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
@@ -339,12 +359,14 @@ export default function DecisionWorkspace() {
       const { generated: gen } = await api.ai.assist("suggest_options", buildContext());
       if (!gen?.title) throw new Error("No option generated");
       const inserted = await api.options.create(id, { title: gen.title, description: gen.description || null, sort_order: options.length } as any);
+      const newOutcomes: Outcome[] = [];
       if (inserted && gen.outcomes) {
-        for (const oc of gen.outcomes) {
-          await api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any);
-        }
+        const created = await Promise.all(gen.outcomes.map((oc: any) =>
+          api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any)
+        ));
+        newOutcomes.push(...created);
       }
-      await load();
+      setOptions(prev => [...prev, { ...inserted, outcomes: newOutcomes }]);
       toast({ title: `AI suggested: "${gen.title}"` });
     } catch (err: any) {
       toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });
@@ -358,10 +380,10 @@ export default function DecisionWorkspace() {
     try {
       const { generated: gen } = await api.ai.assist("suggest_outcomes", { ...buildContext(), target_option_title: opt.title, target_option_outcomes: opt.outcomes.map(oc => ({ description: oc.description })) });
       if (!gen?.outcomes) throw new Error("No outcomes generated");
-      for (const oc of gen.outcomes) {
-        await api.outcomes.create(optionId, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any);
-      }
-      await load();
+      const created = await Promise.all(gen.outcomes.map((oc: any) =>
+        api.outcomes.create(optionId, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any)
+      ));
+      setOptions(prev => prev.map(o => o.id === optionId ? { ...o, outcomes: [...o.outcomes, ...created] } : o));
       toast({ title: `Added ${gen.outcomes.length} suggested outcomes` });
     } catch (err: any) {
       toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });
@@ -386,10 +408,10 @@ export default function DecisionWorkspace() {
     try {
       const { generated: gen } = await api.ai.assist("suggest_premortems", buildContext());
       if (!gen?.premortems) throw new Error("No premortems generated");
-      for (const pm of gen.premortems) {
-        await api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any);
-      }
-      await load();
+      const newPms = await Promise.all(gen.premortems.map((pm: any) =>
+        api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any)
+      ));
+      setPremortems(prev => [...prev, ...newPms]);
       toast({ title: `Added ${gen.premortems.length} potential risks` });
     } catch (err: any) {
       toast({ title: "Suggestion failed", description: err.message, variant: "destructive" });

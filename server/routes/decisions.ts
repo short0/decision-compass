@@ -23,6 +23,28 @@ decisionsRouter.get("/", async (req, res) => {
   res.json(rows.reverse());
 });
 
+decisionsRouter.get("/:id/workspace", async (req, res) => {
+  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
+  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+
+  const [opts, pms] = await Promise.all([
+    db.select().from(options).where(eq(options.decisionId, req.params.id)).orderBy(options.sortOrder),
+    db.select().from(premortems).where(eq(premortems.decisionId, req.params.id)).orderBy(premortems.sortOrder),
+  ]);
+
+  const optIds = opts.map((o) => o.id);
+  const allOutcomes = optIds.length > 0
+    ? await db.select().from(outcomes).where(inArray(outcomes.optionId, optIds)).orderBy(outcomes.sortOrder)
+    : [];
+
+  const optionsWithOutcomes = opts.map((o) => ({
+    ...o,
+    outcomes: allOutcomes.filter((oc) => oc.optionId === o.id),
+  }));
+
+  res.json({ decision: d, options: optionsWithOutcomes, premortems: pms });
+});
+
 decisionsRouter.get("/:id", async (req, res) => {
   const [d] = await db
     .select()

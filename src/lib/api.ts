@@ -74,6 +74,7 @@ export const api = {
   decisions: {
     list: () => req<Decision[]>("/api/decisions"),
     get: (id: string) => req<Decision>(`/api/decisions/${id}`),
+    workspace: (id: string) => req<{ decision: Decision; options: (Option & { outcomes: Outcome[] })[]; premortems: Premortem[] }>(`/api/decisions/${id}/workspace`),
     create: (data: { title: string; context?: string }) =>
       req<Decision>("/api/decisions", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Decision>) =>
