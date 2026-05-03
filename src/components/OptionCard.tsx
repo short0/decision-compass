@@ -1,7 +1,8 @@
 import { useState, useRef, useLayoutEffect, useEffect, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, Loader2, GripVertical, AlertCircle } from "lucide-react";
+import { Trash2, Plus, ChevronDown, ChevronUp, Sparkles, GripVertical, AlertCircle } from "lucide-react";
+import CompassSpinner from "@/components/CompassSpinner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSortable } from "@dnd-kit/sortable";
@@ -257,7 +258,7 @@ export default function OptionCard({
                   className="text-xs text-primary"
                 >
                   {suggestingOutcomes ? (
-                    <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                    <CompassSpinner size={12} />
                   ) : (
                     <Sparkles className="w-3 h-3 mr-1" />
                   )}

@@ -1,6 +1,7 @@
 import { useState, useLayoutEffect, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, AlertTriangle, Sparkles, Loader2, GripVertical } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Sparkles, GripVertical } from "lucide-react";
+import CompassSpinner from "@/components/CompassSpinner";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DndContext,
@@ -194,7 +195,7 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
             className="flex-1"
           >
             {suggestingPremortems ? (
-              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+              <CompassSpinner size={16} />
             ) : (
               <Sparkles className="w-4 h-4 mr-1" />
             )}
