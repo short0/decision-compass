@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Scale, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home, Loader2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function DecisionSidebar() {
@@ -64,12 +65,94 @@ export default function DecisionSidebar() {
 
   if (collapsed) {
     return (
-      <div className="w-12 border-r border-border bg-sidebar-background flex flex-col items-center py-3 gap-2 shrink-0">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCollapsed(false)}>
-          <PanelLeft className="w-4 h-4" />
-        </Button>
-        <Scale className="w-4 h-4 text-primary mt-2" />
-      </div>
+      <TooltipProvider delayDuration={300}>
+        <div className="w-12 border-r border-border bg-sidebar-background flex flex-col items-center py-3 gap-1 shrink-0 h-full">
+          {/* Top: expand + logo */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setCollapsed(false)}>
+                <PanelLeft className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Expand sidebar</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button onClick={() => navigate("/")} className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition-colors mt-1">
+                <Scale className="w-4 h-4 text-primary" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Decy — Home</TooltipContent>
+          </Tooltip>
+
+          <div className="w-8 border-t border-border my-1" />
+
+          {/* Nav */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
+                <Home className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">Home</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/")}>
+                <Plus className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">New Decision</TooltipContent>
+          </Tooltip>
+
+          {/* Decisions list — active indicator dots */}
+          {decisions.length > 0 && (
+            <>
+              <div className="w-8 border-t border-border my-1" />
+              <div className="flex-1 flex flex-col items-center gap-1 overflow-hidden w-full px-1">
+                {decisions.map(d => (
+                  <Tooltip key={d.id}>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => navigate(`/decision/${d.id}`)}
+                        className={`h-7 w-8 rounded-md flex items-center justify-center transition-colors text-xs font-bold ${
+                          activeId === d.id
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-muted-foreground hover:bg-sidebar-accent/50"
+                        }`}
+                        data-testid={`link-decision-collapsed-${d.id}`}
+                      >
+                        {d.title.charAt(0).toUpperCase()}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{d.title}</TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Bottom: theme + user */}
+          <div className="mt-auto flex flex-col items-center gap-1">
+            <div className="w-8 border-t border-border mb-1" />
+            <ThemeToggle />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {isGuest ? (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate("/auth")}>
+                    <User className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleSignOut}>
+                    <LogOut className="w-4 h-4" />
+                  </Button>
+                )}
+              </TooltipTrigger>
+              <TooltipContent side="right">{isGuest ? "Sign In / Sign Up" : "Sign Out"}</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </TooltipProvider>
     );
   }
 
