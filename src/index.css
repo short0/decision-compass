@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 220 25% 10%;
 
-    --primary: 35 92% 50%;
+    --primary: 215 55% 42%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 15% 92%;
@@ -24,7 +24,7 @@
     --muted: 220 15% 94%;
     --muted-foreground: 220 10% 45%;
 
-    --accent: 220 20% 96%;
+    --accent: 220 20% 94%;
     --accent-foreground: 220 25% 10%;
 
     --destructive: 0 72% 51%;
@@ -33,23 +33,23 @@
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 38 92% 50%;
+    --warning: 38 90% 48%;
     --warning-foreground: 0 0% 100%;
 
     --border: 220 13% 88%;
     --input: 220 13% 88%;
-    --ring: 35 92% 50%;
+    --ring: 215 55% 42%;
 
     --radius: 0.625rem;
 
     --sidebar-background: 220 20% 97%;
     --sidebar-foreground: 220 10% 30%;
-    --sidebar-primary: 35 92% 50%;
+    --sidebar-primary: 215 55% 42%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 15% 94%;
     --sidebar-accent-foreground: 220 25% 10%;
     --sidebar-border: 220 13% 88%;
-    --sidebar-ring: 35 92% 50%;
+    --sidebar-ring: 215 55% 42%;
 
     --font-display: 'Inter', sans-serif;
     --font-mono: 'JetBrains Mono', monospace;
@@ -65,7 +65,7 @@
     --popover: 222 22% 11%;
     --popover-foreground: 220 15% 90%;
 
-    --primary: 35 92% 50%;
+    --primary: 215 60% 58%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 222 18% 16%;
@@ -88,16 +88,16 @@
 
     --border: 222 15% 18%;
     --input: 222 15% 18%;
-    --ring: 35 92% 50%;
+    --ring: 215 60% 58%;
 
     --sidebar-background: 222 25% 6%;
     --sidebar-foreground: 220 10% 65%;
-    --sidebar-primary: 35 92% 50%;
+    --sidebar-primary: 215 60% 58%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 18% 14%;
     --sidebar-accent-foreground: 220 15% 90%;
     --sidebar-border: 222 15% 16%;
-    --sidebar-ring: 35 92% 50%;
+    --sidebar-ring: 215 60% 58%;
   }
 }
 
@@ -122,7 +122,7 @@
   }
 
   .gradient-primary {
-    background: linear-gradient(135deg, hsl(35 92% 50%), hsl(25 95% 55%));
+    background: linear-gradient(135deg, hsl(215 55% 42%), hsl(215 65% 52%));
   }
 
   .gradient-surface {
@@ -130,13 +130,13 @@
   }
 
   .text-gradient {
-    background: linear-gradient(135deg, hsl(35 92% 50%), hsl(25 95% 55%));
+    background: linear-gradient(135deg, hsl(215 55% 42%), hsl(215 65% 55%));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
 
   .shadow-glow {
-    box-shadow: 0 0 20px -5px hsl(35 92% 50% / 0.3);
+    box-shadow: 0 0 20px -5px hsl(215 55% 42% / 0.3);
   }
 }
