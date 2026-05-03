@@ -512,23 +512,29 @@ export default function DecisionWorkspace() {
 
           <div className="max-w-5xl mx-auto px-4 py-6 space-y-6 flex-1 w-full">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                onBlur={saveDecision}
-                className="text-2xl font-bold border-none bg-transparent px-0 focus-visible:ring-0 h-auto"
-                placeholder="What decision are you making?"
-                data-testid="input-decision-title"
-              />
-              <Textarea
-                value={context}
-                onChange={(e) => setContext(e.target.value)}
-                onBlur={saveDecision}
-                className="border-none bg-transparent px-0 focus-visible:ring-0 resize-none text-muted-foreground"
-                placeholder="Describe the context and constraints..."
-                rows={2}
-                data-testid="input-decision-context"
-              />
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">What decision are you making?</p>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  onBlur={saveDecision}
+                  className="text-2xl font-bold border-none bg-transparent px-0 focus-visible:ring-0 h-auto"
+                  placeholder="e.g. Should I accept the job offer?"
+                  data-testid="input-decision-title"
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Context &amp; constraints</p>
+                <Textarea
+                  value={context}
+                  onChange={(e) => setContext(e.target.value)}
+                  onBlur={saveDecision}
+                  className="border-none bg-transparent px-0 focus-visible:ring-0 resize-none text-muted-foreground"
+                  placeholder="What's the situation? Any key constraints or trade-offs to keep in mind?"
+                  rows={2}
+                  data-testid="input-decision-context"
+                />
+              </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" onClick={autoGenerate} disabled={generating || !title.trim()} data-testid="button-auto-generate">
                   {generating ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wand2 className="w-4 h-4 mr-2" />}
