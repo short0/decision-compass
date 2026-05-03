@@ -58,7 +58,14 @@ export default function DecisionWorkspace() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+
+  const loadingRef = useRef(true);
+  const currentIdRef = useRef(id);
+
   useEffect(() => {
+    currentIdRef.current = id;
     setDecision(null);
     setTitle("");
     setContext("");
@@ -66,6 +73,7 @@ export default function DecisionWorkspace() {
     setPremortems([]);
     setBiases([]);
     setDeleting(false);
+    loadingRef.current = true;
     setLoading(true);
     undoStack.current = [];
     redoStack.current = [];
@@ -75,19 +83,22 @@ export default function DecisionWorkspace() {
 
   const load = useCallback(async () => {
     if (!id) return;
+    const loadId = id;
+    loadingRef.current = true;
     setLoading(true);
     try {
-      const { decision: d, options: opts, premortems: pms } = await api.decisions.workspace(id);
+      const { decision: d, options: opts, premortems: pms } = await api.decisions.workspace(loadId);
+      if (currentIdRef.current !== loadId) return;
       if (!d) { navigate("/"); return; }
       setDecision(d);
       setTitle(d.title);
-      setContext(d.context || "");
+      setContext(d.context ?? "");
       setOptions(opts || []);
       setPremortems(pms || []);
     } catch {
-      navigate("/");
+      if (currentIdRef.current === loadId) navigate("/");
     } finally {
-      setLoading(false);
+      if (currentIdRef.current === loadId) { loadingRef.current = false; setLoading(false); }
     }
   }, [id, navigate]);
 
@@ -144,13 +155,10 @@ export default function DecisionWorkspace() {
   }, []);
 
   const saveDecision = async () => {
-    if (!id) return;
+    if (!id || loadingRef.current) return;
     await api.decisions.update(id, { title, context: context || null });
     window.dispatchEvent(new Event("decisions-updated"));
   };
-
-  const [loading, setLoading] = useState(true);
-  const [deleting, setDeleting] = useState(false);
   const deleteCancelRef = useRef<HTMLButtonElement>(null);
 
   const deleteDecision = async () => {
