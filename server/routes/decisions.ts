@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "../db.js";
 import { decisions, options, outcomes, premortems } from "../../shared/schema.js";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 export const decisionsRouter = Router();
 
@@ -14,6 +14,8 @@ function requireAuth(req: any, res: any, next: any) {
 
 decisionsRouter.use(requireAuth);
 
+// ─── Decisions ────────────────────────────────────────────────────────────────
+
 decisionsRouter.get("/", async (req, res) => {
   const rows = await db
     .select()
@@ -23,37 +25,31 @@ decisionsRouter.get("/", async (req, res) => {
   res.json(rows.reverse());
 });
 
+// Workspace: fetch decision + options + premortems in parallel, then outcomes
 decisionsRouter.get("/:id/workspace", async (req, res) => {
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
-
-  const [opts, pms] = await Promise.all([
-    db.select().from(options).where(eq(options.decisionId, req.params.id)).orderBy(options.sortOrder),
-    db.select().from(premortems).where(eq(premortems.decisionId, req.params.id)).orderBy(premortems.sortOrder),
+  const id = req.params.id;
+  const [[d], opts, pms] = await Promise.all([
+    db.select().from(decisions).where(eq(decisions.id, id)).limit(1),
+    db.select().from(options).where(eq(options.decisionId, id)).orderBy(options.sortOrder),
+    db.select().from(premortems).where(eq(premortems.decisionId, id)).orderBy(premortems.sortOrder),
   ]);
+  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const optIds = opts.map((o) => o.id);
   const allOutcomes = optIds.length > 0
     ? await db.select().from(outcomes).where(inArray(outcomes.optionId, optIds)).orderBy(outcomes.sortOrder)
     : [];
 
-  const optionsWithOutcomes = opts.map((o) => ({
-    ...o,
-    outcomes: allOutcomes.filter((oc) => oc.optionId === o.id),
-  }));
-
-  res.json({ decision: d, options: optionsWithOutcomes, premortems: pms });
+  res.json({
+    decision: d,
+    options: opts.map((o) => ({ ...o, outcomes: allOutcomes.filter((oc) => oc.optionId === o.id) })),
+    premortems: pms,
+  });
 });
 
 decisionsRouter.get("/:id", async (req, res) => {
-  const [d] = await db
-    .select()
-    .from(decisions)
-    .where(eq(decisions.id, req.params.id))
-    .limit(1);
-  if (!d || d.userId !== req.session.userId) {
-    return res.status(404).json({ error: "Not found" });
-  }
+  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
+  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
   res.json(d);
 });
 
@@ -67,6 +63,7 @@ decisionsRouter.post("/", async (req, res) => {
   res.json(d);
 });
 
+// Seed: batch-insert everything; parallelize outcomes + premortems inserts
 decisionsRouter.post("/seed", async (req, res) => {
   const { title, context, options: optionsData, premortems: premortems_data } = req.body;
   if (!title) return res.status(400).json({ error: "Title required" });
@@ -77,8 +74,8 @@ decisionsRouter.post("/seed", async (req, res) => {
     .returning();
 
   const decisionId = d.id;
-
   const insertedOptions: any[] = [];
+
   if (optionsData?.length > 0) {
     const optRows = await db
       .insert(options)
@@ -90,62 +87,60 @@ decisionsRouter.post("/seed", async (req, res) => {
       })))
       .returning();
     insertedOptions.push(...optRows);
+  }
 
-    const outcomeValues: any[] = [];
-    for (let i = 0; i < optionsData.length; i++) {
-      const opt = optionsData[i];
-      const createdOpt = insertedOptions[i];
-      if (opt.outcomes?.length > 0) {
-        opt.outcomes.forEach((oc: any, j: number) => {
-          outcomeValues.push({
-            optionId: createdOpt.id,
-            description: oc.description,
-            probability: String(oc.probability),
-            impact: String(oc.impact),
-            sortOrder: j,
-          });
+  const outcomeValues: any[] = [];
+  for (let i = 0; i < (optionsData?.length ?? 0); i++) {
+    const opt = optionsData[i];
+    const createdOpt = insertedOptions[i];
+    if (opt.outcomes?.length > 0) {
+      opt.outcomes.forEach((oc: any, j: number) => {
+        outcomeValues.push({
+          optionId: createdOpt.id,
+          description: oc.description,
+          probability: String(oc.probability),
+          impact: String(oc.impact),
+          sortOrder: j,
         });
-      }
-    }
-    if (outcomeValues.length > 0) {
-      await db.insert(outcomes).values(outcomeValues);
+      });
     }
   }
 
-  if (premortems_data?.length > 0) {
-    await db.insert(premortems).values(
-      premortems_data.map((pm: any, i: number) => ({
-        decisionId,
-        reason: pm.reason,
-        severity: pm.severity || "moderate",
-        frequency: pm.frequency || "possible",
-        sortOrder: i,
-      }))
-    );
-  }
+  await Promise.all([
+    outcomeValues.length > 0 ? db.insert(outcomes).values(outcomeValues) : Promise.resolve(),
+    premortems_data?.length > 0
+      ? db.insert(premortems).values(
+          premortems_data.map((pm: any, i: number) => ({
+            decisionId,
+            reason: pm.reason,
+            severity: pm.severity || "moderate",
+            frequency: pm.frequency || "possible",
+            sortOrder: i,
+          }))
+        )
+      : Promise.resolve(),
+  ]);
 
   res.json({ id: decisionId });
 });
 
+// PATCH: combine auth check + update into one query via userId in WHERE
 decisionsRouter.patch("/:id", async (req, res) => {
-  const [existing] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
-  if (!existing || existing.userId !== req.session.userId) {
-    return res.status(404).json({ error: "Not found" });
-  }
   const allowed = ["title", "context", "status", "chosenOptionId", "reflection", "actualOutcome", "outcomeDate"];
-  const updates: any = {};
+  const updates: any = { updatedAt: new Date() };
   for (const key of allowed) {
     if (key in req.body) updates[key] = req.body[key];
   }
-  updates.updatedAt = new Date();
   const [d] = await db
     .update(decisions)
     .set(updates)
-    .where(eq(decisions.id, req.params.id))
+    .where(and(eq(decisions.id, req.params.id), eq(decisions.userId, req.session.userId!)))
     .returning();
+  if (!d) return res.status(404).json({ error: "Not found" });
   res.json(d);
 });
 
+// DELETE: parallel auth+opts fetch → parallel child deletes → sequential parent deletes
 decisionsRouter.delete("/:id", async (req, res) => {
   const id = req.params.id;
   const [[existing], opts] = await Promise.all([
@@ -165,25 +160,32 @@ decisionsRouter.delete("/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Options ──────────────────────────────────────────────────────────────────
+
+// GET: parallel auth + options fetch, then outcomes
 decisionsRouter.get("/:id/options", async (req, res) => {
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
+  const id = req.params.id;
+  const [[d], opts] = await Promise.all([
+    db.select({ userId: decisions.userId }).from(decisions).where(eq(decisions.id, id)).limit(1),
+    db.select().from(options).where(eq(options.decisionId, id)).orderBy(options.sortOrder),
+  ]);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
-  const opts = await db.select().from(options).where(eq(options.decisionId, req.params.id)).orderBy(options.sortOrder);
   const optIds = opts.map((o) => o.id);
-  let allOutcomes: any[] = [];
-  if (optIds.length > 0) {
-    allOutcomes = await db.select().from(outcomes).where(inArray(outcomes.optionId, optIds)).orderBy(outcomes.sortOrder);
-  }
-  const result = opts.map((o) => ({
-    ...o,
-    outcomes: allOutcomes.filter((oc) => oc.optionId === o.id),
-  }));
-  res.json(result);
+  const allOutcomes = optIds.length > 0
+    ? await db.select().from(outcomes).where(inArray(outcomes.optionId, optIds)).orderBy(outcomes.sortOrder)
+    : [];
+
+  res.json(opts.map((o) => ({ ...o, outcomes: allOutcomes.filter((oc) => oc.optionId === o.id) })));
 });
 
+// POST: lightweight auth (userId only) then insert
 decisionsRouter.post("/:id/options", async (req, res) => {
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
+  const [d] = await db
+    .select({ userId: decisions.userId })
+    .from(decisions)
+    .where(eq(decisions.id, req.params.id))
+    .limit(1);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const { title, description, sort_order } = req.body;
@@ -199,11 +201,14 @@ decisionsRouter.post("/:id/options", async (req, res) => {
   res.json(o);
 });
 
+// PATCH: single JOIN for auth, then update
 decisionsRouter.patch("/options/:optionId", async (req, res) => {
-  const [o] = await db.select().from(options).where(eq(options.id, req.params.optionId)).limit(1);
-  if (!o) return res.status(404).json({ error: "Not found" });
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(options)
+    .innerJoin(decisions, eq(options.decisionId, decisions.id))
+    .where(eq(options.id, req.params.optionId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const updates: any = {};
   if ("title" in req.body) updates.title = req.body.title;
@@ -215,23 +220,34 @@ decisionsRouter.patch("/options/:optionId", async (req, res) => {
   res.json(updated);
 });
 
+// DELETE: JOIN auth, then parallel child deletes, then option delete
 decisionsRouter.delete("/options/:optionId", async (req, res) => {
-  const [o] = await db.select().from(options).where(eq(options.id, req.params.optionId)).limit(1);
-  if (!o) return res.status(404).json({ error: "Not found" });
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const optionId = req.params.optionId;
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(options)
+    .innerJoin(decisions, eq(options.decisionId, decisions.id))
+    .where(eq(options.id, optionId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
-  await db.delete(outcomes).where(eq(outcomes.optionId, req.params.optionId));
-  await db.delete(premortems).where(eq(premortems.optionId, req.params.optionId));
-  await db.delete(options).where(eq(options.id, req.params.optionId));
+  await Promise.all([
+    db.delete(outcomes).where(eq(outcomes.optionId, optionId)),
+    db.delete(premortems).where(eq(premortems.optionId, optionId)),
+  ]);
+  await db.delete(options).where(eq(options.id, optionId));
   res.json({ ok: true });
 });
 
+// ─── Outcomes ─────────────────────────────────────────────────────────────────
+
+// POST: JOIN auth across options→decisions, then insert
 decisionsRouter.post("/options/:optionId/outcomes", async (req, res) => {
-  const [o] = await db.select().from(options).where(eq(options.id, req.params.optionId)).limit(1);
-  if (!o) return res.status(404).json({ error: "Not found" });
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(options)
+    .innerJoin(decisions, eq(options.decisionId, decisions.id))
+    .where(eq(options.id, req.params.optionId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const { description, probability, impact, sort_order } = req.body;
   const [oc] = await db
@@ -247,12 +263,15 @@ decisionsRouter.post("/options/:optionId/outcomes", async (req, res) => {
   res.json(oc);
 });
 
+// PATCH: 3-table JOIN for auth (outcomes→options→decisions), then update
 decisionsRouter.patch("/outcomes/:outcomeId", async (req, res) => {
-  const [oc] = await db.select().from(outcomes).where(eq(outcomes.id, req.params.outcomeId)).limit(1);
-  if (!oc) return res.status(404).json({ error: "Not found" });
-  const [o] = await db.select().from(options).where(eq(options.id, oc.optionId)).limit(1);
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(outcomes)
+    .innerJoin(options, eq(outcomes.optionId, options.id))
+    .innerJoin(decisions, eq(options.decisionId, decisions.id))
+    .where(eq(outcomes.id, req.params.outcomeId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const updates: any = {};
   if ("description" in req.body) updates.description = req.body.description;
@@ -264,27 +283,40 @@ decisionsRouter.patch("/outcomes/:outcomeId", async (req, res) => {
   res.json(updated);
 });
 
+// DELETE: 3-table JOIN for auth, then delete
 decisionsRouter.delete("/outcomes/:outcomeId", async (req, res) => {
-  const [oc] = await db.select().from(outcomes).where(eq(outcomes.id, req.params.outcomeId)).limit(1);
-  if (!oc) return res.status(404).json({ error: "Not found" });
-  const [o] = await db.select().from(options).where(eq(options.id, oc.optionId)).limit(1);
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, o.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(outcomes)
+    .innerJoin(options, eq(outcomes.optionId, options.id))
+    .innerJoin(decisions, eq(options.decisionId, decisions.id))
+    .where(eq(outcomes.id, req.params.outcomeId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   await db.delete(outcomes).where(eq(outcomes.id, req.params.outcomeId));
   res.json({ ok: true });
 });
 
-decisionsRouter.get("/:id/premortems", async (req, res) => {
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+// ─── Premortems ───────────────────────────────────────────────────────────────
 
-  const rows = await db.select().from(premortems).where(eq(premortems.decisionId, req.params.id)).orderBy(premortems.sortOrder);
+// GET: parallel auth + premortems fetch
+decisionsRouter.get("/:id/premortems", async (req, res) => {
+  const id = req.params.id;
+  const [[d], rows] = await Promise.all([
+    db.select({ userId: decisions.userId }).from(decisions).where(eq(decisions.id, id)).limit(1),
+    db.select().from(premortems).where(eq(premortems.decisionId, id)).orderBy(premortems.sortOrder),
+  ]);
+  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
   res.json(rows);
 });
 
+// POST: lightweight auth then insert
 decisionsRouter.post("/:id/premortems", async (req, res) => {
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, req.params.id)).limit(1);
+  const [d] = await db
+    .select({ userId: decisions.userId })
+    .from(decisions)
+    .where(eq(decisions.id, req.params.id))
+    .limit(1);
   if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const { reason, severity, frequency, option_id, sort_order } = req.body;
@@ -302,11 +334,14 @@ decisionsRouter.post("/:id/premortems", async (req, res) => {
   res.json(pm);
 });
 
+// PATCH: JOIN auth (premortems→decisions), then update
 decisionsRouter.patch("/premortems/:pmId", async (req, res) => {
-  const [pm] = await db.select().from(premortems).where(eq(premortems.id, req.params.pmId)).limit(1);
-  if (!pm) return res.status(404).json({ error: "Not found" });
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, pm.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(premortems)
+    .innerJoin(decisions, eq(premortems.decisionId, decisions.id))
+    .where(eq(premortems.id, req.params.pmId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   const updates: any = {};
   if ("reason" in req.body) updates.reason = req.body.reason;
@@ -318,11 +353,14 @@ decisionsRouter.patch("/premortems/:pmId", async (req, res) => {
   res.json(updated);
 });
 
+// DELETE: JOIN auth, then delete
 decisionsRouter.delete("/premortems/:pmId", async (req, res) => {
-  const [pm] = await db.select().from(premortems).where(eq(premortems.id, req.params.pmId)).limit(1);
-  if (!pm) return res.status(404).json({ error: "Not found" });
-  const [d] = await db.select().from(decisions).where(eq(decisions.id, pm.decisionId)).limit(1);
-  if (!d || d.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
+  const [row] = await db
+    .select({ userId: decisions.userId })
+    .from(premortems)
+    .innerJoin(decisions, eq(premortems.decisionId, decisions.id))
+    .where(eq(premortems.id, req.params.pmId));
+  if (!row || row.userId !== req.session.userId) return res.status(404).json({ error: "Not found" });
 
   await db.delete(premortems).where(eq(premortems.id, req.params.pmId));
   res.json({ ok: true });
