@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api, type Decision } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
@@ -16,6 +16,7 @@ export default function DecisionSidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const { user, isGuest, refetch } = useAuth();
   const navigate = useNavigate();
   const { id: activeId } = useParams();
@@ -168,7 +169,7 @@ export default function DecisionSidebar() {
       </div>
 
       <AlertDialog open={!!pendingDeleteId} onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}>
-        <AlertDialogContent>
+        <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); cancelRef.current?.focus(); }}>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this decision?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -176,7 +177,7 @@ export default function DecisionSidebar() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel autoFocus disabled={deleting} data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogCancel ref={cancelRef} disabled={deleting} data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleting}

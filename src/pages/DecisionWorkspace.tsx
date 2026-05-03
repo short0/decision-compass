@@ -125,6 +125,7 @@ export default function DecisionWorkspace() {
   };
 
   const [deleting, setDeleting] = useState(false);
+  const deleteCancelRef = useRef<HTMLButtonElement>(null);
 
   const deleteDecision = async () => {
     if (!id) return;
@@ -486,7 +487,7 @@ export default function DecisionWorkspace() {
                       <span className="hidden sm:inline">Delete</span>
                     </Button>
                   </AlertDialogTrigger>
-                  <AlertDialogContent>
+                  <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); deleteCancelRef.current?.focus(); }}>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete this decision?</AlertDialogTitle>
                       <AlertDialogDescription>
@@ -494,7 +495,7 @@ export default function DecisionWorkspace() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel autoFocus disabled={deleting}>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel ref={deleteCancelRef} disabled={deleting}>Cancel</AlertDialogCancel>
                       <AlertDialogAction onClick={deleteDecision} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                         {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                         {deleting ? "Deleting…" : "Delete"}
