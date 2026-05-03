@@ -513,10 +513,6 @@ export default function DecisionWorkspace() {
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
-                <Button variant={showAi ? "default" : "outline"} size="sm" onClick={() => setShowAi(!showAi)}>
-                  <Sparkles className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">AI Chat</span>
-                </Button>
               </div>
             </div>
           </header>
@@ -804,6 +800,14 @@ export default function DecisionWorkspace() {
             />
           </div>
         )}
+
+        <button
+          onClick={() => setShowAi(!showAi)}
+          data-testid="button-ai-chat-bubble"
+          className="fixed bottom-5 right-5 z-30 h-12 w-12 rounded-full shadow-lg flex items-center justify-center transition-colors bg-primary text-primary-foreground hover:bg-primary/90"
+        >
+          <Sparkles className="w-5 h-5" />
+        </button>
       </div>
     </TooltipProvider>
   );
