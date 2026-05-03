@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, LogOut, Trash2, PanelLeftClose, PanelLeft, User, Home, Loader2 } from "lucide-react";
 import decyIconUrl from "@assets/decy-icon.png";
-import decyWordmarkUrl from "@assets/decy-wordmark.svg";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import ThemeToggle from "@/components/ThemeToggle";
 

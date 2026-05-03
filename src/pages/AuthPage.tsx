@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { ArrowRight, ArrowLeft } from "lucide-react";
-import decyWordmarkUrl from "@assets/decy-wordmark.svg";
+import decyIconUrl from "@assets/decy-icon.png";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -47,7 +47,7 @@ export default function AuthPage() {
         className="w-full max-w-md space-y-8"
       >
         <div className="text-center space-y-2">
-          <img src={decyWordmarkUrl} alt="Decy" className="h-10 w-auto mx-auto mb-4" />
+          <img src={decyIconUrl} alt="Decy" className="w-16 h-16 mx-auto scale-[1.3] mb-4" />
           <p className="text-muted-foreground">
             Structured decision-making, powered by AI
           </p>
