@@ -35,10 +35,15 @@ export default function AiPanel({ decision, options, premortems, onClose }: Prop
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   const send = async () => {
     const text = input.trim();
@@ -78,28 +83,41 @@ export default function AiPanel({ decision, options, premortems, onClose }: Prop
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border flex items-center justify-between">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between shrink-0 bg-primary/5">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold">AI Chat</h3>
+          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <span className="text-sm font-semibold">Decy AI</span>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="w-4 h-4" />
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} data-testid="button-ai-close">
+          <X className="w-3.5 h-3.5" />
         </Button>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages */}
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.length === 0 ? (
-          <div className="text-center py-12 text-muted-foreground text-sm">
-            <Sparkles className="w-8 h-8 mx-auto mb-3 opacity-30" />
-            <p>Ask anything about your decision.</p>
-            <p className="text-xs mt-1">e.g. "What am I missing?" or "Is my probability estimate realistic?"</p>
+          <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
+            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+              <Sparkles className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Ask anything about your decision</p>
+              <p className="text-xs text-muted-foreground mt-1">e.g. "What am I missing?" or "Is my estimate realistic?"</p>
+            </div>
           </div>
         ) : (
           messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
-                m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"
+            <div key={i} className={`flex gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              {m.role === "assistant" && (
+                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Sparkles className="w-3 h-3 text-primary" />
+                </div>
+              )}
+              <div className={`max-w-[78%] rounded-2xl px-3 py-2 text-sm ${
+                m.role === "user"
+                  ? "bg-primary text-primary-foreground rounded-br-sm"
+                  : "bg-muted rounded-bl-sm"
               }`}>
                 {m.role === "assistant" ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -113,28 +131,33 @@ export default function AiPanel({ decision, options, premortems, onClose }: Prop
           ))
         )}
         {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
-          <div className="flex justify-start">
-            <div className="bg-muted rounded-lg px-3 py-2">
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+          <div className="flex gap-2 justify-start">
+            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <Sparkles className="w-3 h-3 text-primary" />
+            </div>
+            <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
             </div>
           </div>
         )}
       </div>
 
-      <div className="p-3 border-t border-border space-y-2">
+      {/* Input */}
+      <div className="p-3 border-t border-border shrink-0 space-y-2">
         <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex gap-2">
           <Input
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about your decision..."
+            placeholder="Message Decy AI..."
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 text-sm h-9"
           />
-          <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
-            <Send className="w-4 h-4" />
+          <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={isLoading || !input.trim()} data-testid="button-ai-send">
+            <Send className="w-3.5 h-3.5" />
           </Button>
         </form>
-        <p className="text-[11px] text-center text-muted-foreground">Decy can make mistakes. Check important info.</p>
+        <p className="text-[10px] text-center text-muted-foreground">Decy can make mistakes. Check important info.</p>
       </div>
     </div>
   );

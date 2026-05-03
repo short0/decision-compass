@@ -464,7 +464,7 @@ export default function DecisionWorkspace() {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
-        <div className={`flex-1 transition-all flex flex-col ${showAi ? "mr-80 lg:mr-96" : ""}`}>
+        <div className="flex-1 flex flex-col">
           <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur-sm z-10">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-end">
               <div className="flex items-center gap-1">
@@ -791,7 +791,7 @@ export default function DecisionWorkspace() {
         </div>
 
         {showAi && (
-          <div className="fixed right-0 top-0 h-full w-80 lg:w-96 border-l border-border bg-background z-20 flex flex-col">
+          <div className="fixed bottom-20 right-5 z-30 w-80 lg:w-96 h-[480px] rounded-2xl border border-border bg-background shadow-2xl flex flex-col overflow-hidden">
             <AiPanel
               decision={decision}
               options={options}
