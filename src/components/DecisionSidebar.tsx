@@ -176,7 +176,7 @@ export default function DecisionSidebar() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting} data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
+            <AlertDialogCancel autoFocus disabled={deleting} data-testid="button-delete-cancel">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
               disabled={deleting}
