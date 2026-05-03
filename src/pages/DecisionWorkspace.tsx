@@ -418,7 +418,7 @@ export default function DecisionWorkspace() {
       setOptions(prev => [...prev, ...newOptions]);
       if (gen.premortems) {
         const newPms = await Promise.all(gen.premortems.map((pm: any) =>
-          api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any)
+          api.premortems.create(id, { reason: pm.reason, frequency: pm.frequency || "possible", severity: pm.severity || "moderate" } as any)
         ));
         setPremortems(prev => [...prev, ...newPms]);
       }
@@ -485,7 +485,7 @@ export default function DecisionWorkspace() {
       const { generated: gen } = await api.ai.assist("suggest_premortems", buildContext());
       if (!gen?.premortems) throw new Error("No premortems generated");
       const newPms = await Promise.all(gen.premortems.map((pm: any) =>
-        api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any)
+        api.premortems.create(id, { reason: pm.reason, frequency: pm.frequency || "possible", severity: pm.severity || "moderate" } as any)
       ));
       setPremortems(prev => [...prev, ...newPms]);
       toast({ title: `Added ${gen.premortems.length} potential risks` });
