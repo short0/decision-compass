@@ -191,7 +191,7 @@ export default function DecisionWorkspace() {
       },
       unexecute: async () => {
         const tempId = `temp-${Date.now()}`;
-        setOptions(prev => [...prev, { id: tempId, decisionId: id!, title: optionData.title, description: null, sortOrder: optionData.sortOrder, createdAt: new Date().toISOString(), outcomes: [] } as any].sort((a, b) => a.sortOrder - b.sortOrder));
+        setOptions(prev => [...prev, { id: tempId, decisionId: id!, title: optionData.title, description: null, sortOrder: optionData.sortOrder, createdAt: new Date().toISOString(), outcomes: optionData.outcomes } as any].sort((a, b) => a.sortOrder - b.sortOrder));
         const created = await api.options.create(id!, { title: optionData.title, sortOrder: optionData.sortOrder } as any);
         recreatedId = created.id;
         const newOutcomes = await Promise.all(
