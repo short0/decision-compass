@@ -495,7 +495,7 @@ export default function DecisionWorkspace() {
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                      <AlertDialogCancel ref={deleteCancelRef} disabled={deleting}>Cancel</AlertDialogCancel>
+                      <AlertDialogCancel ref={deleteCancelRef} disabled={deleting} className="focus:ring-2 focus:ring-offset-2 focus:ring-ring">Cancel</AlertDialogCancel>
                       <AlertDialogAction onClick={deleteDecision} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                         {deleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
                         {deleting ? "Deleting…" : "Delete"}
