@@ -524,9 +524,8 @@ export default function DecisionWorkspace() {
                 </Button>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
-                    <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-destructive">
-                      <Trash2 className="w-4 h-4 mr-1" />
-                      <span className="hidden sm:inline">Delete</span>
+                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive">
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent onOpenAutoFocus={(e) => { e.preventDefault(); requestAnimationFrame(() => deleteCancelRef.current?.focus()); }} onCloseAutoFocus={(e) => e.preventDefault()}>
