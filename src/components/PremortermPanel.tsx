@@ -125,7 +125,7 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
           <h3 className="font-semibold text-lg">Premortem Analysis</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Imagine this decision has already failed. What went wrong? For each risk, rate Likelihood (1–5) × Impact (1–5) to get a Risk Score.
+          Imagine this decision has already failed. What went wrong? For each risk, rate Frequency (1–5) × Severity (1–5) to get a Risk Score.
         </p>
 
         {localPremortems.length > 0 && (
@@ -134,19 +134,19 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
             <span>Risk / Failure Reason</span>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <span className="text-center cursor-help underline decoration-dotted">Likelihood</span>
+                <span className="text-center cursor-help underline decoration-dotted">Frequency</span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[280px] z-[100]">
-                <p className="text-sm font-semibold mb-1">Likelihood (1–5)</p>
+                <p className="text-sm font-semibold mb-1">Frequency (1–5)</p>
                 <p className="text-xs text-muted-foreground">How probable is this failure mode?</p>
               </TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <span className="text-center cursor-help underline decoration-dotted">Impact</span>
+                <span className="text-center cursor-help underline decoration-dotted">Severity</span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[280px] z-[100]">
-                <p className="text-sm font-semibold mb-1">Impact (1–5)</p>
+                <p className="text-sm font-semibold mb-1">Severity (1–5)</p>
                 <p className="text-xs text-muted-foreground">How severe would the damage be?</p>
               </TooltipContent>
             </Tooltip>
@@ -156,7 +156,7 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[280px] z-[100]">
                 <p className="text-sm font-semibold mb-1">Risk Score (1–25)</p>
-                <p className="text-xs text-muted-foreground">Likelihood × Impact. ≥20 = critical, ≥12 = high, ≥6 = medium.</p>
+                <p className="text-xs text-muted-foreground">Frequency × Severity. ≥20 = critical, ≥12 = high, ≥6 = medium.</p>
               </TooltipContent>
             </Tooltip>
             <span />
@@ -319,7 +319,7 @@ function SortablePremortermRow({
         />
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Likelihood</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Frequency</label>
             <select
               value={likelihood}
               onChange={(e) => onUpdate(premortem.id, { frequency: e.target.value })}
@@ -331,7 +331,7 @@ function SortablePremortermRow({
             </select>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Impact</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Severity</label>
             <select
               value={impact}
               onChange={(e) => onUpdate(premortem.id, { severity: e.target.value })}
