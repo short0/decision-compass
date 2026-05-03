@@ -58,7 +58,7 @@ export default function DecisionWorkspace() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  useEffect(() => { setBiases([]); setDeleting(false); }, [id]);
+  useEffect(() => { setBiases([]); setDeleting(false); setLoading(true); }, [id]);
 
   const load = useCallback(async () => {
     if (!id) return;
