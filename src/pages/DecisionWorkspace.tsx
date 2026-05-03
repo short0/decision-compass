@@ -446,9 +446,18 @@ export default function DecisionWorkspace() {
     getRiskScore(a.frequency || "possible", a.severity || "moderate")
   );
 
-  const riskCountByImpact = ["severe", "significant", "moderate", "minor", "negligible"].map(imp => ({
-    impact: imp,
-    count: premortems.filter(p => (p.severity || "moderate") === imp).length,
+  const riskBands = [
+    { label: "Critical", min: 20, color: "border-destructive/50 bg-destructive/15", textColor: "text-destructive" },
+    { label: "High",     min: 12, color: "border-destructive/30 bg-destructive/8",  textColor: "text-destructive" },
+    { label: "Medium",   min: 6,  color: "border-warning/40 bg-warning/10",          textColor: "text-warning" },
+    { label: "Low",      min: 0,  color: "border-border bg-muted/30",                textColor: "text-muted-foreground" },
+  ];
+  const riskCountByBand = riskBands.map(band => ({
+    ...band,
+    count: premortems.filter(p => {
+      const score = getRiskScore(p.frequency || "possible", p.severity || "moderate");
+      return score >= band.min && (band.min === 0 ? score < 6 : true) && score < (riskBands[riskBands.indexOf(band) - 1]?.min ?? Infinity);
+    }).length,
   }));
 
   const topRisks = sortedPremortems.slice(0, 5);
@@ -701,16 +710,11 @@ export default function DecisionWorkspace() {
                             })}
                           </div>
                         )}
-                        <div className="grid grid-cols-5 gap-2 text-center">
-                          {riskCountByImpact.map(({ impact, count }) => (
-                            <div key={impact} className={`p-2 rounded-lg border ${
-                              impact === "severe" ? "border-destructive/40 bg-destructive/10" :
-                              impact === "significant" ? "border-destructive/20 bg-destructive/5" :
-                              impact === "moderate" ? "border-warning/30 bg-warning/5" :
-                              "border-border bg-muted/30"
-                            }`}>
-                              <p className="text-lg font-bold">{count}</p>
-                              <p className="text-xs text-muted-foreground capitalize leading-tight">{impact}</p>
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                          {riskCountByBand.map(({ label, count, color, textColor }) => (
+                            <div key={label} className={`p-2 rounded-lg border ${color}`}>
+                              <p className={`text-lg font-bold ${textColor}`}>{count}</p>
+                              <p className="text-xs text-muted-foreground leading-tight">{label}</p>
                             </div>
                           ))}
                         </div>
