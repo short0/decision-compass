@@ -140,3 +140,20 @@
     box-shadow: 0 0 20px -5px hsl(215 55% 42% / 0.3);
   }
 }
+
+@keyframes compass-seek {
+  0%   { transform: rotate(45deg); animation-timing-function: cubic-bezier(0.4, 0, 1, 0.6); }
+  8%   { transform: rotate(-80deg); animation-timing-function: cubic-bezier(0, 0.4, 0.6, 1); }
+  18%  { transform: rotate(230deg); animation-timing-function: cubic-bezier(0.4, 0, 1, 0.6); }
+  27%  { transform: rotate(-15deg); animation-timing-function: cubic-bezier(0, 0.4, 0.6, 1); }
+  37%  { transform: rotate(310deg); animation-timing-function: cubic-bezier(0.4, 0, 1, 0.6); }
+  46%  { transform: rotate(-55deg); animation-timing-function: cubic-bezier(0, 0.4, 0.6, 1); }
+  54%  { transform: rotate(170deg); animation-timing-function: cubic-bezier(0.3, 0, 0.7, 1); }
+  61%  { transform: rotate(80deg);  animation-timing-function: ease-out; }
+  67%  { transform: rotate(25deg);  animation-timing-function: ease-out; }
+  73%  { transform: rotate(55deg);  animation-timing-function: ease-out; }
+  79%  { transform: rotate(42deg);  animation-timing-function: ease-out; }
+  85%  { transform: rotate(47deg);  animation-timing-function: ease-out; }
+  91%  { transform: rotate(45deg);  animation-timing-function: ease-in-out; }
+  100% { transform: rotate(45deg); }
+}

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import OptionCard, { type BiasAnnotation } from "@/components/OptionCard";
+import CompassSpinner from "@/components/CompassSpinner";
 import PremortermPanel, { getRiskScore } from "@/components/PremortermPanel";
 import AiPanel from "@/components/AiPanel";
 import {
@@ -515,7 +516,7 @@ export default function DecisionWorkspace() {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center h-full">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        <CompassSpinner size={56} />
       </div>
     );
   }
