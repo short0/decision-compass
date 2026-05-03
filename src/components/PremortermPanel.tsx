@@ -247,7 +247,7 @@ function SortablePremortermRow({
   const riskScore = getRiskScore(likelihood, impact);
 
   return (
-    <div ref={setNodeRef} style={style} className="space-y-1">
+    <div ref={setNodeRef} style={style} className="space-y-1 group">
       {/* Desktop layout */}
       <div className="hidden sm:grid grid-cols-[24px_1fr_130px_130px_56px_36px] gap-2 items-start">
         <button
@@ -286,7 +286,7 @@ function SortablePremortermRow({
         <div className={`h-9 flex items-center justify-center rounded-md border text-xs font-bold ${riskColor(riskScore)}`}>
           {riskScore}
         </div>
-        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={() => onDelete(premortem.id)}>
+        <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => onDelete(premortem.id)}>
           <Trash2 className="w-3 h-3 text-muted-foreground" />
         </Button>
       </div>
@@ -305,7 +305,7 @@ function SortablePremortermRow({
             <span className={`px-2 py-0.5 rounded text-xs font-bold border ${riskColor(riskScore)}`}>
               Risk: {riskScore}
             </span>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(premortem.id)}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => onDelete(premortem.id)}>
               <Trash2 className="w-3 h-3 text-muted-foreground" />
             </Button>
           </div>

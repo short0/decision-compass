@@ -123,7 +123,7 @@ export default function OptionCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`glass-panel ${optionBias ? "ring-1 ring-warning/50" : ""}`}
+      className={`glass-panel group ${optionBias ? "ring-1 ring-warning/50" : ""}`}
     >
       <div className="p-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -172,7 +172,7 @@ export default function OptionCard({
           <Button variant="ghost" size="icon" onClick={handleExpandToggle}>
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
-          <Button variant="ghost" size="icon" onClick={onDelete}>
+          <Button variant="ghost" size="icon" onClick={onDelete} className="opacity-0 group-hover:opacity-100 transition-opacity">
             <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
           </Button>
         </div>
@@ -313,7 +313,7 @@ function SortableOutcomeRow({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="space-y-1">
+    <div ref={setNodeRef} style={style} className="space-y-1 group/row">
       <div className="hidden sm:grid grid-cols-[24px_1fr_80px_80px_32px] gap-2 items-start">
         <button
           {...attributes}
@@ -350,7 +350,7 @@ function SortableOutcomeRow({
           onBlur={() => onUpdate(outcome.id, { impact: Number(impact) })}
           className="h-9 text-sm text-center font-mono"
         />
-        <Button variant="ghost" size="icon" className="h-9 w-8 mt-0" onClick={() => onDelete(outcome.id)}>
+        <Button variant="ghost" size="icon" className="h-9 w-8 mt-0 opacity-0 group-hover/row:opacity-100 transition-opacity" onClick={() => onDelete(outcome.id)}>
           <Trash2 className="w-3 h-3 text-muted-foreground" />
         </Button>
       </div>
@@ -363,7 +363,7 @@ function SortableOutcomeRow({
           >
             <GripVertical className="w-4 h-4" />
           </button>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(outcome.id)}>
+          <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover/row:opacity-100 transition-opacity" onClick={() => onDelete(outcome.id)}>
             <Trash2 className="w-3 h-3 text-muted-foreground" />
           </Button>
         </div>
