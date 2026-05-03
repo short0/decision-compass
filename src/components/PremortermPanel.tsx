@@ -20,10 +20,10 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Option, Premortem } from "@/lib/api";
 import type { BiasAnnotation } from "@/components/OptionCard";
 
-// Likelihood: stored in the `frequency` column
-// Impact: stored in the `severity` column
+// Frequency: stored in the `frequency` column
+// Severity: stored in the `severity` column
 
-export const LIKELIHOOD_OPTIONS = [
+export const FREQUENCY_OPTIONS = [
   { value: "very unlikely", label: "Very Unlikely", score: 1 },
   { value: "unlikely", label: "Unlikely", score: 2 },
   { value: "possible", label: "Possible", score: 3 },
@@ -31,7 +31,7 @@ export const LIKELIHOOD_OPTIONS = [
   { value: "very likely", label: "Very Likely", score: 5 },
 ];
 
-export const IMPACT_OPTIONS = [
+export const SEVERITY_OPTIONS = [
   { value: "negligible", label: "Negligible", score: 1 },
   { value: "minor", label: "Minor", score: 2 },
   { value: "moderate", label: "Moderate", score: 3 },
@@ -39,16 +39,16 @@ export const IMPACT_OPTIONS = [
   { value: "severe", label: "Severe", score: 5 },
 ];
 
-export function getLikelihoodScore(value: string) {
-  return LIKELIHOOD_OPTIONS.find(o => o.value === value)?.score ?? 3;
+export function getFrequencyScore(value: string) {
+  return FREQUENCY_OPTIONS.find(o => o.value === value)?.score ?? 3;
 }
 
-export function getImpactScore(value: string) {
-  return IMPACT_OPTIONS.find(o => o.value === value)?.score ?? 3;
+export function getSeverityScore(value: string) {
+  return SEVERITY_OPTIONS.find(o => o.value === value)?.score ?? 3;
 }
 
-export function getRiskScore(likelihood: string, impact: string) {
-  return getLikelihoodScore(likelihood) * getImpactScore(impact);
+export function getRiskScore(frequency: string, severity: string) {
+  return getFrequencyScore(frequency) * getSeverityScore(severity);
 }
 
 function riskColor(score: number) {
@@ -58,15 +58,15 @@ function riskColor(score: number) {
   return "bg-muted text-muted-foreground border-border";
 }
 
-function likelihoodColor(value: string) {
-  const score = getLikelihoodScore(value);
+function frequencyColor(value: string) {
+  const score = getFrequencyScore(value);
   if (score >= 4) return "bg-destructive/10 text-destructive border-destructive/20";
   if (score === 3) return "bg-warning/10 text-warning border-warning/20";
   return "bg-muted text-muted-foreground border-border";
 }
 
-function impactColor(value: string) {
-  const score = getImpactScore(value);
+function severityColor(value: string) {
+  const score = getSeverityScore(value);
   if (score >= 4) return "bg-destructive/10 text-destructive border-destructive/20";
   if (score === 3) return "bg-warning/10 text-warning border-warning/20";
   return "bg-muted text-muted-foreground border-border";
@@ -125,7 +125,7 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
           <h3 className="font-semibold text-lg">Premortem Analysis</h3>
         </div>
         <p className="text-sm text-muted-foreground">
-          Imagine this decision has already failed. What went wrong? For each risk, rate Likelihood (1–5) × Impact (1–5) to get a Risk Score.
+          Imagine this decision has already failed. What went wrong? For each risk, rate Frequency (1–5) × Severity (1–5) to get a Risk Score.
         </p>
 
         {localPremortems.length > 0 && (
@@ -134,19 +134,19 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
             <span>Risk / Failure Reason</span>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <span className="text-center cursor-help underline decoration-dotted">Likelihood</span>
+                <span className="text-center cursor-help underline decoration-dotted">Frequency</span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[280px] z-[100]">
-                <p className="text-sm font-semibold mb-1">Likelihood (1–5)</p>
+                <p className="text-sm font-semibold mb-1">Frequency (1–5)</p>
                 <p className="text-xs text-muted-foreground">How probable is this failure mode?</p>
               </TooltipContent>
             </Tooltip>
             <Tooltip delayDuration={0}>
               <TooltipTrigger asChild>
-                <span className="text-center cursor-help underline decoration-dotted">Impact</span>
+                <span className="text-center cursor-help underline decoration-dotted">Severity</span>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[280px] z-[100]">
-                <p className="text-sm font-semibold mb-1">Impact (1–5)</p>
+                <p className="text-sm font-semibold mb-1">Severity (1–5)</p>
                 <p className="text-xs text-muted-foreground">How severe would the damage be?</p>
               </TooltipContent>
             </Tooltip>
@@ -156,7 +156,7 @@ export default function PremortermPanel({ premortems, options, biases, onAdd, on
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-[280px] z-[100]">
                 <p className="text-sm font-semibold mb-1">Risk Score (1–25)</p>
-                <p className="text-xs text-muted-foreground">Likelihood × Impact. ≥20 = critical, ≥12 = high, ≥6 = medium.</p>
+                <p className="text-xs text-muted-foreground">Frequency × Severity. ≥20 = critical, ≥12 = high, ≥6 = medium.</p>
               </TooltipContent>
             </Tooltip>
             <span />
@@ -242,9 +242,9 @@ function SortablePremortermRow({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const likelihood = premortem.frequency || "possible";
-  const impact = premortem.severity || "moderate";
-  const riskScore = getRiskScore(likelihood, impact);
+  const frequency = premortem.frequency || "possible";
+  const severity = premortem.severity || "moderate";
+  const riskScore = getRiskScore(frequency, severity);
 
   return (
     <div ref={setNodeRef} style={style} className="space-y-1 group">
@@ -266,20 +266,20 @@ function SortablePremortermRow({
           style={{ overflowY: "hidden", minHeight: "36px" }}
         />
         <select
-          value={likelihood}
+          value={frequency}
           onChange={(e) => onUpdate(premortem.id, { frequency: e.target.value })}
-          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${likelihoodColor(likelihood)}`}
+          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${frequencyColor(frequency)}`}
         >
-          {LIKELIHOOD_OPTIONS.map(o => (
+          {FREQUENCY_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
           ))}
         </select>
         <select
-          value={impact}
+          value={severity}
           onChange={(e) => onUpdate(premortem.id, { severity: e.target.value })}
-          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${impactColor(impact)}`}
+          className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer shrink-0 w-full ${severityColor(severity)}`}
         >
-          {IMPACT_OPTIONS.map(o => (
+          {SEVERITY_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
           ))}
         </select>
@@ -319,25 +319,25 @@ function SortablePremortermRow({
         />
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Likelihood</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Frequency</label>
             <select
-              value={likelihood}
+              value={frequency}
               onChange={(e) => onUpdate(premortem.id, { frequency: e.target.value })}
-              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${likelihoodColor(likelihood)}`}
+              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${frequencyColor(frequency)}`}
             >
-              {LIKELIHOOD_OPTIONS.map(o => (
+              {FREQUENCY_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground mb-1 block">Impact</label>
+            <label className="text-xs text-muted-foreground mb-1 block">Severity</label>
             <select
-              value={impact}
+              value={severity}
               onChange={(e) => onUpdate(premortem.id, { severity: e.target.value })}
-              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${impactColor(impact)}`}
+              className={`h-9 px-2 rounded-md text-xs font-medium border cursor-pointer w-full ${severityColor(severity)}`}
             >
-              {IMPACT_OPTIONS.map(o => (
+              {SEVERITY_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label} ({o.score})</option>
               ))}
             </select>
