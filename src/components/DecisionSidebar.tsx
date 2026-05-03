@@ -209,7 +209,7 @@ export default function DecisionSidebar() {
               variant="ghost"
               size="icon"
               className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
-              onClick={(e) => { e.stopPropagation(); setPendingDeleteId(d.id); }}
+              onClick={(e) => { e.stopPropagation(); setDeleting(false); setPendingDeleteId(d.id); }}
               data-testid={`button-delete-decision-${d.id}`}
             >
               <Trash2 className="w-3 h-3" />
