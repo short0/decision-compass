@@ -253,7 +253,7 @@ export default function HomePage() {
         className="w-full max-w-2xl space-y-8"
       >
         <div className="text-center space-y-3">
-          <img src={decyIconUrl} alt="Decy" className="w-12 h-12 mx-auto" />
+          <img src={decyIconUrl} alt="Decy" className="w-20 h-20 mx-auto scale-[1.3]" />
           <h1 className="text-2xl font-semibold text-foreground">
             What decision are you facing?
           </h1>
