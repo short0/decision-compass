@@ -95,20 +95,20 @@ export default function DecisionWorkspace() {
     const cmd = undoStack.current.at(-1);
     if (!cmd) return;
     undoStack.current = undoStack.current.slice(0, -1);
-    await cmd.unexecute();
     redoStack.current = [...redoStack.current, cmd].slice(-20);
     syncUndo();
     toast({ title: `Undid: ${cmd.description}` });
+    cmd.unexecute();
   };
 
   const handleRedo = async () => {
     const cmd = redoStack.current.at(-1);
     if (!cmd) return;
     redoStack.current = redoStack.current.slice(0, -1);
-    await cmd.execute();
     undoStack.current = [...undoStack.current, cmd].slice(-20);
     syncUndo();
     toast({ title: `Redid: ${cmd.description}` });
+    cmd.execute();
   };
 
   // Keyboard shortcuts
@@ -179,9 +179,11 @@ export default function DecisionWorkspace() {
         const toDelete = recreatedId || optionId;
         recreatedId = null;
         setOptions(prev => prev.filter(o => o.id !== toDelete));
-        await api.options.delete(toDelete);
+        if (!toDelete.startsWith('temp-')) await api.options.delete(toDelete);
       },
       unexecute: async () => {
+        const tempId = `temp-${Date.now()}`;
+        setOptions(prev => [...prev, { id: tempId, decisionId: id!, title: optionData.title, description: null, sortOrder: optionData.sortOrder, createdAt: new Date().toISOString(), outcomes: [] } as any].sort((a, b) => a.sortOrder - b.sortOrder));
         const created = await api.options.create(id!, { title: optionData.title, sortOrder: optionData.sortOrder } as any);
         recreatedId = created.id;
         const newOutcomes = await Promise.all(
@@ -189,14 +191,15 @@ export default function DecisionWorkspace() {
             api.outcomes.create(created.id, { description: oc.description, probability: oc.probability, impact: oc.impact, sortOrder: oc.sortOrder } as any)
           )
         );
-        setOptions(prev => [...prev, { ...created, outcomes: newOutcomes }].sort((a, b) => a.sortOrder - b.sortOrder));
+        setOptions(prev => prev.map(o => o.id === tempId ? { ...created, outcomes: newOutcomes } : o).sort((a, b) => a.sortOrder - b.sortOrder));
       },
     };
     await executeCommand(cmd);
   };
 
-  const updateOption = async (optionId: string, updates: Partial<Option>) => {
-    await api.options.update(optionId, updates);
+  const updateOption = (optionId: string, updates: Partial<Option>) => {
+    setOptions(prev => prev.map(o => o.id === optionId ? { ...o, ...updates } : o));
+    api.options.update(optionId, updates);
   };
 
   const addOutcome = async (optionId: string) => {
@@ -254,12 +257,14 @@ export default function DecisionWorkspace() {
         const toDelete = recreatedId || outcomeId;
         recreatedId = null;
         setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: o.outcomes.filter(oc => oc.id !== toDelete) } : o));
-        await api.outcomes.delete(toDelete);
+        if (!toDelete.startsWith('temp-')) await api.outcomes.delete(toDelete);
       },
       unexecute: async () => {
+        const tempId = `temp-${Date.now()}`;
+        setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: [...o.outcomes, { id: tempId, optionId: parentOptionId, description: outcomeData!.description, probability: outcomeData!.probability, impact: outcomeData!.impact, sortOrder: outcomeData!.sortOrder, createdAt: new Date().toISOString() } as any].sort((a, b) => a.sortOrder - b.sortOrder) } : o));
         const created = await api.outcomes.create(parentOptionId!, { description: outcomeData!.description, probability: outcomeData!.probability, impact: outcomeData!.impact, sortOrder: outcomeData!.sortOrder } as any);
         recreatedId = created.id;
-        setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: [...o.outcomes, created].sort((a, b) => a.sortOrder - b.sortOrder) } : o));
+        setOptions(prev => prev.map(o => o.id === parentOptionId ? { ...o, outcomes: o.outcomes.map(oc => oc.id === tempId ? created : oc) } : o));
       },
     };
     await executeCommand(cmd);
@@ -288,18 +293,19 @@ export default function DecisionWorkspace() {
 
   const addPremortem = async () => {
     if (!id) return;
+    const tempId = `temp-${Date.now()}`;
     const sortOrder = premortems.length;
     let createdId: string | null = null;
     const cmd: Command = {
       description: "Add risk",
       execute: async () => {
+        setPremortems(prev => [...prev, { id: tempId, decisionId: id, reason: "New risk", severity: "moderate", frequency: "possible", sortOrder, createdAt: new Date().toISOString() } as any]);
         const created = await api.premortems.create(id, { reason: "New risk", severity: "moderate", frequency: "possible", sortOrder } as any);
         createdId = created.id;
-        setPremortems(prev => [...prev, created]);
+        setPremortems(prev => prev.map(p => p.id === tempId ? created : p));
       },
       unexecute: async () => {
         if (createdId) {
-          await api.premortems.delete(createdId);
           const deleted = createdId;
           createdId = null;
           setPremortems(prev => prev.filter(p => p.id !== deleted));
@@ -322,14 +328,16 @@ export default function DecisionWorkspace() {
       description: "Delete risk",
       execute: async () => {
         const toDelete = recreatedId || pmId;
-        await api.premortems.delete(toDelete);
         recreatedId = null;
         setPremortems(prev => prev.filter(p => p.id !== toDelete));
+        if (!toDelete.startsWith('temp-')) await api.premortems.delete(toDelete);
       },
       unexecute: async () => {
+        const tempId = `temp-${Date.now()}`;
+        setPremortems(prev => [...prev, { id: tempId, decisionId: id!, reason: pmData.reason, severity: pmData.severity, frequency: pmData.frequency, sortOrder: pmData.sortOrder, createdAt: new Date().toISOString() } as any].sort((a, b) => a.sortOrder - b.sortOrder));
         const created = await api.premortems.create(id!, { reason: pmData.reason, severity: pmData.severity, frequency: pmData.frequency, sortOrder: pmData.sortOrder } as any);
         recreatedId = created.id;
-        setPremortems(prev => [...prev, created].sort((a, b) => a.sortOrder - b.sortOrder));
+        setPremortems(prev => prev.map(p => p.id === tempId ? created : p));
       },
     };
     await executeCommand(cmd);
