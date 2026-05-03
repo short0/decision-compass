@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, type Decision, type Option, type Outcome, type Premortem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -60,25 +60,24 @@ export default function DecisionWorkspace() {
 
   useEffect(() => { setBiases([]); setDeleting(false); setLoading(true); }, [id]);
 
-  const load = useCallback(async () => {
+  useEffect(() => {
     if (!id) return;
+    let cancelled = false;
+    const startTime = Date.now();
     setLoading(true);
-    try {
-      const { decision: d, options: opts, premortems: pms } = await api.decisions.workspace(id);
+    api.decisions.workspace(id).then(({ decision: d, options: opts, premortems: pms }) => {
+      if (cancelled) return;
       if (!d) { navigate("/"); return; }
       setDecision(d);
       setTitle(d.title);
       setContext(d.context || "");
       setOptions(opts || []);
       setPremortems(pms || []);
-    } catch {
-      navigate("/");
-    } finally {
-      setLoading(false);
-    }
+      const remaining = Math.max(0, 400 - (Date.now() - startTime));
+      setTimeout(() => { if (!cancelled) setLoading(false); }, remaining);
+    }).catch(() => { if (!cancelled) navigate("/"); });
+    return () => { cancelled = true; };
   }, [id, navigate]);
-
-  useEffect(() => { load(); }, [load]);
 
   const syncUndo = () => {
     setCanUndo(undoStack.current.length > 0);
