@@ -235,13 +235,20 @@ aiRouter.post("/assist", async (req, res) => {
       ],
       tools: [tool],
       tool_choice: { type: "function", function: { name: toolName } },
+      max_tokens: 4096,
     });
 
     const toolCall = response.choices[0]?.message?.tool_calls?.[0];
     if (!toolCall) {
       return res.status(500).json({ error: "No structured response from AI" });
     }
-    const args = JSON.parse(toolCall.function.arguments);
+    let args: any;
+    try {
+      args = JSON.parse(toolCall.function.arguments);
+    } catch {
+      console.error("AI returned malformed JSON (likely truncated):", toolCall.function.arguments.slice(-200));
+      return res.status(500).json({ error: "AI response was too large or malformed. Try a shorter decision description." });
+    }
     res.json({ generated: args });
   } catch (err: any) {
     console.error("AI assist error:", err);

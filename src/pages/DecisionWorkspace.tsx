@@ -423,7 +423,10 @@ export default function DecisionWorkspace() {
         }
         newOptions.push({ ...inserted, outcomes: newOutcomes });
       }
-      setOptions(prev => [...prev, ...newOptions]);
+      setOptions(prev => {
+        const newIds = new Set(newOptions.map(o => o.id));
+        return [...prev.filter(o => !newIds.has(o.id)), ...newOptions].sort((a, b) => a.sortOrder - b.sortOrder);
+      });
       if (gen.premortems) {
         const newPms = await Promise.all(gen.premortems.map((pm: any) =>
           api.premortems.create(id, { reason: pm.reason, frequency: pm.frequency || "possible", severity: pm.severity || "moderate" } as any)

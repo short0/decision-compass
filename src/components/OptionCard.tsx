@@ -244,7 +244,7 @@ export default function OptionCard({
                   </span>
                 </div>
               )}
-              <div className="flex gap-2">
+              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Button variant="ghost" size="sm" onClick={onAddOutcome} className="text-xs text-muted-foreground hover:text-foreground">
                   <Plus className="w-3 h-3 mr-1" />
                   Add Outcome
