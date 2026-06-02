@@ -18,11 +18,11 @@ function requireAuth(req: any, res: any, next: any) {
 aiRouter.use(requireAuth);
 
 const systemPrompts: Record<string, string> = {
-  suggest_options: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user is making a decision. Based on the context provided, suggest ONE new alternative option they may not have considered, with 2-3 possible outcomes. Be concrete and specific. IMPORTANT: Probabilities must be whole numbers (e.g. 60, not 0.6) and should sum to 100 for all outcomes of the option. Impact is on a scale of -10 to +10.`,
-  suggest_outcomes: `You are a decision analysis expert. For the specific option provided, suggest 2-3 additional outcomes the user may have missed, including both positive and negative scenarios. IMPORTANT: Probabilities must be whole numbers (e.g. 60, not 0.6). When combined with existing outcomes, all probabilities for this option should sum to approximately 100. Impact is on a scale of -10 to +10.`,
+  suggest_options: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user is making a decision. Based on the context provided, suggest ONE new alternative option they may not have considered, with 3-4 possible outcomes covering a range of realistic scenarios (best case, worst case, and likely middle grounds). Be concrete and specific — avoid generic options. IMPORTANT: Probabilities must be whole numbers (e.g. 60, not 0.6) and MUST sum to exactly 100 for all outcomes of the option. Impact is on a scale of -10 to +10.`,
+  suggest_outcomes: `You are a decision analysis expert. For the specific option provided, suggest 2-3 additional outcomes the user may have missed, including both positive and negative scenarios. Make outcomes concrete and specific, not generic. IMPORTANT: Probabilities must be whole numbers (e.g. 60, not 0.6). When combined with existing outcomes, all probabilities for this option should sum to approximately 100. Impact is on a scale of -10 to +10.`,
   check_biases: `You are a cognitive bias expert inspired by Annie Duke's work. Analyze the user's decision framework and identify specific cognitive biases. For each bias found, specify which element it relates to (an option title, outcome description, or premortem reason). Be direct and cite specific bias names. For each bias, provide a concise explanation (1-2 sentences max) and include a brief real-world example.`,
-  suggest_premortems: `You are a premortem analysis expert inspired by Gary Klein's premortem technique. Imagine this decision has already failed. Identify 3-5 specific, concrete reasons why it could fail. Consider risks the user may have overlooked. Be specific and actionable.`,
-  auto_generate: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user will give you a decision title and context. You must generate a complete decision analysis with options, outcomes, and premortem risks. Be concrete, realistic, and balanced. IMPORTANT: For each option, the probabilities of all outcomes MUST sum to exactly 100. Use whole numbers (e.g. 60, not 0.6). Impact is on a scale of -10 to +10.`,
+  suggest_premortems: `You are a premortem analysis expert inspired by Gary Klein's premortem technique. Imagine this decision has already failed. Identify 3-5 specific, concrete reasons why it could fail — focus on risks the user may have overlooked, not obvious ones. Be specific and actionable. For each risk, assign a realistic frequency and severity using ONLY these exact values: frequency must be one of "very unlikely", "unlikely", "possible", "likely", "very likely"; severity must be one of "negligible", "minor", "moderate", "significant", "severe".`,
+  auto_generate: `You are a decision analysis expert inspired by Annie Duke's "How to Decide". The user will give you a decision title and context. Generate a complete decision analysis with exactly 2-3 concrete, distinct options (avoid generic "do nothing" as a sole option), each with exactly 3-4 realistic outcomes spanning best-case, worst-case, and likely middle scenarios. Also generate 4-5 specific premortem risks. Be concrete and specific — avoid vague or generic content. IMPORTANT: For each option, the probabilities of all outcomes MUST sum to exactly 100. Use whole numbers (e.g. 60, not 0.6). Impact is on a scale of -10 to +10. For premortems, frequency must be one of "very unlikely", "unlikely", "possible", "likely", "very likely"; severity must be one of "negligible", "minor", "moderate", "significant", "severe".`,
 };
 
 const tools: Record<string, any> = {
@@ -124,9 +124,10 @@ const tools: Record<string, any> = {
               type: "object",
               properties: {
                 reason: { type: "string" },
-                severity: { type: "string", enum: ["low", "medium", "high"] },
+                frequency: { type: "string", enum: ["very unlikely", "unlikely", "possible", "likely", "very likely"] },
+                severity: { type: "string", enum: ["negligible", "minor", "moderate", "significant", "severe"] },
               },
-              required: ["reason", "severity"],
+              required: ["reason", "frequency", "severity"],
               additionalProperties: false,
             },
           },
@@ -175,9 +176,10 @@ const tools: Record<string, any> = {
               type: "object",
               properties: {
                 reason: { type: "string" },
-                severity: { type: "string", enum: ["low", "medium", "high"] },
+                frequency: { type: "string", enum: ["very unlikely", "unlikely", "possible", "likely", "very likely"] },
+                severity: { type: "string", enum: ["negligible", "minor", "moderate", "significant", "severe"] },
               },
-              required: ["reason", "severity"],
+              required: ["reason", "frequency", "severity"],
               additionalProperties: false,
             },
           },

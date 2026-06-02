@@ -426,7 +426,7 @@ export default function DecisionWorkspace() {
       setOptions(prev => [...prev, ...newOptions]);
       if (gen.premortems) {
         const newPms = await Promise.all(gen.premortems.map((pm: any) =>
-          api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any)
+          api.premortems.create(id, { reason: pm.reason, frequency: pm.frequency || "possible", severity: pm.severity || "moderate" } as any)
         ));
         setPremortems(prev => [...prev, ...newPms]);
       }
@@ -493,7 +493,7 @@ export default function DecisionWorkspace() {
       const { generated: gen } = await api.ai.assist("suggest_premortems", buildContext());
       if (!gen?.premortems) throw new Error("No premortems generated");
       const newPms = await Promise.all(gen.premortems.map((pm: any) =>
-        api.premortems.create(id, { reason: pm.reason, severity: pm.severity || "moderate" } as any)
+        api.premortems.create(id, { reason: pm.reason, frequency: pm.frequency || "possible", severity: pm.severity || "moderate" } as any)
       ));
       setPremortems(prev => [...prev, ...newPms]);
       toast({ title: `Added ${gen.premortems.length} potential risks` });
@@ -659,29 +659,37 @@ export default function DecisionWorkspace() {
             <AnimatePresence mode="wait">
               {tab === "options" && (
                 <motion.div key="options" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} className="space-y-4">
-                  <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
-                    <SortableContext items={options.map(o => o.id)} strategy={verticalListSortingStrategy}>
-                      {options.map((option, i) => (
-                        <OptionCard
-                          key={(option as any)._stableKey ?? option.id}
-                          option={option}
-                          index={i}
-                          totalOptions={options.length}
-                          ev={calcEV(option.outcomes)}
-                          biases={biases}
-                          onUpdate={updateOption}
-                          onDelete={() => deleteOption(option.id)}
-                          onAddOutcome={() => addOutcome(option.id)}
-                          onUpdateOutcome={updateOutcome}
-                          onUpdateOutcomeLive={updateOutcomeLive}
-                          onDeleteOutcome={deleteOutcome}
-                          onReorderOutcomes={(reordered) => reorderOutcomes(option.id, reordered)}
-                          onSuggestOutcomes={suggestOutcomes}
-                          suggestingOutcomes={suggestingOutcomesFor === option.id}
-                        />
-                      ))}
-                    </SortableContext>
-                  </DndContext>
+                  {options.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-14 space-y-3 text-center">
+                      <Target className="w-10 h-10 text-muted-foreground/30" />
+                      <p className="text-sm font-medium text-muted-foreground">No options yet</p>
+                      <p className="text-xs text-muted-foreground/60 max-w-xs">Use <span className="font-medium">Auto-Generate with AI</span> above for a full draft, or add options manually below.</p>
+                    </div>
+                  ) : (
+                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleOptionDragEnd}>
+                      <SortableContext items={options.map(o => o.id)} strategy={verticalListSortingStrategy}>
+                        {options.map((option, i) => (
+                          <OptionCard
+                            key={(option as any)._stableKey ?? option.id}
+                            option={option}
+                            index={i}
+                            totalOptions={options.length}
+                            ev={calcEV(option.outcomes)}
+                            biases={biases}
+                            onUpdate={updateOption}
+                            onDelete={() => deleteOption(option.id)}
+                            onAddOutcome={() => addOutcome(option.id)}
+                            onUpdateOutcome={updateOutcome}
+                            onUpdateOutcomeLive={updateOutcomeLive}
+                            onDeleteOutcome={deleteOutcome}
+                            onReorderOutcomes={(reordered) => reorderOutcomes(option.id, reordered)}
+                            onSuggestOutcomes={suggestOutcomes}
+                            suggestingOutcomes={suggestingOutcomesFor === option.id}
+                          />
+                        ))}
+                      </SortableContext>
+                    </DndContext>
+                  )}
                   <div className="flex gap-2">
                     <Button variant="workspace" onClick={addOption} className="flex-1 py-6" data-testid="button-add-option">
                       <Plus className="w-4 h-4 mr-1" />
