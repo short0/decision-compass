@@ -63,6 +63,7 @@ export default function DecisionWorkspace() {
 
   const loadingRef = useRef(true);
   const currentIdRef = useRef(id);
+  const generatingRef = useRef(false);
 
   useEffect(() => {
     currentIdRef.current = id;
@@ -406,16 +407,27 @@ export default function DecisionWorkspace() {
 
   const autoGenerate = async () => {
     if (!id || !title.trim()) { toast({ title: "Enter a decision title first", variant: "destructive" }); return; }
+    if (generatingRef.current) return;
+    generatingRef.current = true;
     setGenerating(true);
     try {
       const { generated: gen } = await api.ai.assist("auto_generate", { title, context });
       if (!gen?.options) throw new Error("No data generated");
+      // Guard: only accept options with a valid title, cap at 5
+      const validOptions = (gen.options as any[])
+        .filter((opt: any) => typeof opt.title === "string" && opt.title.trim().length > 0)
+        .slice(0, 5);
+      if (validOptions.length === 0) throw new Error("AI returned no valid options");
       const newOptions: (Option & { outcomes: Outcome[] })[] = [];
-      for (let i = 0; i < gen.options.length; i++) {
-        const opt = gen.options[i];
-        const inserted = await api.options.create(id, { title: opt.title, description: opt.description || null, sort_order: options.length + i } as any);
+      // Read current count fresh from state to avoid stale closure for sort_order
+      let baseOrder = 0;
+      setOptions(prev => { baseOrder = prev.length; return prev; });
+      for (let i = 0; i < validOptions.length; i++) {
+        if (currentIdRef.current !== id) break;
+        const opt = validOptions[i];
+        const inserted = await api.options.create(id, { title: opt.title.trim(), description: opt.description || null, sort_order: baseOrder + i } as any);
         const newOutcomes: Outcome[] = [];
-        if (inserted && opt.outcomes) {
+        if (inserted && Array.isArray(opt.outcomes)) {
           const created = await Promise.all(opt.outcomes.map((oc: any) =>
             api.outcomes.create(inserted.id, { description: oc.description, probability: Math.max(0, Math.min(100, oc.probability)), impact: Math.max(-10, Math.min(10, oc.impact)) } as any)
           ));
@@ -428,7 +440,7 @@ export default function DecisionWorkspace() {
         return [...prev.filter(o => !newIds.has(o.id)), ...newOptions].sort((a, b) => a.sortOrder - b.sortOrder);
       });
       if (gen.premortems) {
-        const newPms = await Promise.all(gen.premortems.map((pm: any) =>
+        const newPms = await Promise.all((gen.premortems as any[]).map((pm: any) =>
           api.premortems.create(id, { reason: pm.reason, frequency: pm.frequency || "possible", severity: pm.severity || "moderate" } as any)
         ));
         setPremortems(prev => [...prev, ...newPms]);
@@ -436,7 +448,10 @@ export default function DecisionWorkspace() {
       toast({ title: "AI generated options, outcomes & risks!" });
     } catch (err: any) {
       toast({ title: "Generation failed", description: err.message, variant: "destructive" });
-    } finally { setGenerating(false); }
+    } finally {
+      generatingRef.current = false;
+      setGenerating(false);
+    }
   };
 
   const suggestOption = async () => {
